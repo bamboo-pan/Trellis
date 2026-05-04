@@ -1,4 +1,3 @@
-/* global process */
 /**
  * Trellis Context Injection Plugin
  *
@@ -260,16 +259,7 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, "'\\''")}'`
 }
 
-function powershellQuote(value) {
-  return `'${String(value).replace(/'/g, "''")}'`
-}
-
-function buildTrellisContextPrefix(contextKey, hostPlatform = process.platform) {
-  if (hostPlatform === "win32") {
-    // OpenCode's Windows Bash tool runs through PowerShell, not a POSIX shell.
-    return `$env:TRELLIS_CONTEXT_ID = ${powershellQuote(contextKey)}; `
-  }
-
+function buildTrellisContextPrefix(contextKey) {
   return `export TRELLIS_CONTEXT_ID=${shellQuote(contextKey)}; `
 }
 
@@ -294,7 +284,7 @@ function commandStartsWithTrellisContext(command) {
  * OpenCode TUI may not expose OPENCODE_RUN_ID to Bash. The plugin hook still
  * receives session identity, so inject it into Bash commands before execution.
  */
-function injectTrellisContextIntoBash(ctx, input, output, hostPlatform) {
+function injectTrellisContextIntoBash(ctx, input, output) {
   const args = output?.args
   const commandKey = getBashCommandKey(args)
   if (!commandKey) return false
@@ -306,7 +296,7 @@ function injectTrellisContextIntoBash(ctx, input, output, hostPlatform) {
   const contextKey = ctx.getContextKey(input)
   if (!contextKey) return false
 
-  args[commandKey] = `${buildTrellisContextPrefix(contextKey, hostPlatform)}${command}`
+  args[commandKey] = `${buildTrellisContextPrefix(contextKey)}${command}`
   return true
 }
 
@@ -315,7 +305,7 @@ function injectTrellisContextIntoBash(ctx, input, output, hostPlatform) {
 // (packages/opencode/src/plugin/index.ts — `for ([_, fn] of Object.entries(mod)) await fn(input)`);
 // the previous `{ id, server }` object shape failed with
 // `TypeError: fn is not a function` in 1.2.x.
-export default async ({ directory, platform: hostPlatform = process.platform }) => {
+export default async ({ directory }) => {
   const ctx = new TrellisContext(directory)
   debugLog("inject", "Plugin loaded, directory:", directory)
 
@@ -326,7 +316,7 @@ export default async ({ directory, platform: hostPlatform = process.platform }) 
 
           const toolName = input?.tool?.toLowerCase()
           if (toolName === "bash") {
-            if (injectTrellisContextIntoBash(ctx, input, output, hostPlatform)) {
+            if (injectTrellisContextIntoBash(ctx, input, output)) {
               debugLog("inject", "Injected TRELLIS_CONTEXT_ID into Bash command")
             }
             return

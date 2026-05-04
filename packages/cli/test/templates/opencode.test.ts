@@ -140,7 +140,7 @@ describe("opencode bash session context", () => {
     );
   });
 
-  it("uses PowerShell environment syntax on Windows", async () => {
+  it("uses POSIX export syntax for Bash tool commands on Windows", async () => {
     const hooks = await createOpenCodeInjectHooks("win32");
     const output = {
       args: {
@@ -154,7 +154,7 @@ describe("opencode bash session context", () => {
     );
 
     expect(output.args.command).toBe(
-      "$env:TRELLIS_CONTEXT_ID = 'opencode_oc-a'; python ./.trellis/scripts/task.py start .trellis/tasks/demo",
+      "export TRELLIS_CONTEXT_ID='opencode_oc-a'; python ./.trellis/scripts/task.py start .trellis/tasks/demo",
     );
   });
 
