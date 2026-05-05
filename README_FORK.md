@@ -26,6 +26,8 @@ trellis init -u your-name
 
 The `@rc` install command assumes the fork package has been published with the `rc` npm dist-tag, for example `pnpm publish --access public --tag rc` from `packages/cli`.
 
+Maintainers should follow the documented fork publish flow in [docs/fork-npm-publish.md](docs/fork-npm-publish.md). The reliable manual path is npm web login first, then token-based publish through a temporary npm userconfig.
+
 The package also exposes the short command:
 
 ```bash

@@ -26,6 +26,8 @@ trellis init -u your-name
 
 上面的 `@rc` 安装命令要求 fork 包发布时带有 `rc` npm dist-tag，例如在 `packages/cli` 目录执行 `pnpm publish --access public --tag rc`。
 
+维护者请按 [docs/fork-npm-publish.md](docs/fork-npm-publish.md) 里的 fork 发布流程操作。可靠的手动路径是先完成 npm web 登录，再通过临时 npm userconfig 使用 token 发布。
+
 同时也保留短命令：
 
 ```bash
