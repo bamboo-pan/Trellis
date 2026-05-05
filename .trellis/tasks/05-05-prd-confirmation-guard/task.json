@@ -1,0 +1,28 @@
+{
+  "id": "prd-confirmation-guard",
+  "name": "prd-confirmation-guard",
+  "title": "Lightweight PRD confirmation guard",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "bamboo",
+  "assignee": "bamboo",
+  "createdAt": "2026-05-05",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "prd_status": "confirmed"
+  }
+}

@@ -68,6 +68,18 @@ def _has_curated_jsonl_entry(jsonl_path: Path) -> bool:
     return False
 
 
+def _get_prd_status(task_data: dict) -> str:
+    meta = task_data.get("meta")
+    if isinstance(meta, dict):
+        value = meta.get("prd_status")
+        if value in ("draft", "confirmed", "override"):
+            return value
+    status = task_data.get("status")
+    if status in ("in_progress", "completed"):
+        return "confirmed"
+    return "draft"
+
+
 def read_file(path: Path, fallback: str = "") -> str:
     try:
         return path.read_text(encoding="utf-8")
@@ -184,6 +196,26 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
 
     if not has_context:
         return f"Status: NOT READY\nTask: {task_title}\nSource: {active.source}\nMissing: implement.jsonl / check.jsonl missing or empty\nNext: Curate entries per workflow.md Phase 1.3 (spec + research files only), then `task.py start`"
+
+    prd_status = _get_prd_status(task_data)
+    if prd_status == "draft":
+        return (
+            f"Status: PLANNING (PRD confirmation)\nTask: {task_title}\n"
+            f"Source: {active.source}\n"
+            "Next: use `trellis-brainstorm` Step 8 to present a whole-PRD confirmation summary, "
+            "then wait for a distinct user choice: confirm, revise, or override. "
+            "A local answer to a final clarification/product preference question is not PRD confirmation; "
+            "do NOT run `set-prd-status confirmed` in that same turn unless the same user message "
+            "explicitly confirms the whole PRD."
+        )
+
+    if task_status == "planning":
+        return (
+            f"Status: PLANNING (Phase 1.4)\nTask: {task_title}\n"
+            f"Source: {active.source}\n"
+            f"Next: run `python3 ./.trellis/scripts/task.py start {task_dir.name}` to enter Phase 2. "
+            f"The PRD gate is already satisfied (`prd_status={prd_status}`)."
+        )
 
     return (
         f"Status: READY\nTask: {task_title}\n"

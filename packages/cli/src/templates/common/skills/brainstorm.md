@@ -394,7 +394,7 @@ Record the outcome in PRD as an ADR-lite section:
 
 ## Step 8: Final Confirmation + Implementation Plan
 
-When open questions are resolved, confirm complete requirements with a structured summary and an explicit user choice:
+When open questions are resolved, confirm complete requirements with a whole-PRD structured summary and an explicit user choice:
 
 ### Final confirmation format
 
@@ -434,8 +434,12 @@ Please choose the next step:
 
 1. Confirm PRD and enter implementation
 2. Revise PRD first
-3. Skip confirmation and implement anyway
+3. Override confirmation and implement anyway
 ```
+
+### Anti-misclassification rule
+
+Answering a final clarification, product preference, or other sub-question only resolves that local question; it is not whole-PRD confirmation. Do not run `python3 ./.trellis/scripts/task.py set-prd-status <task-dir> confirmed` in the same turn as receiving a sub-question answer unless that same user message explicitly confirms the whole PRD. If the message only answers the local question, update the PRD, present this Step 8 summary, and wait for a distinct confirm, revise, or override choice.
 
 ### Required status recording
 

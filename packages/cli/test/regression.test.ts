@@ -2453,6 +2453,10 @@ describe("regression: current-task path normalization", () => {
     expect(prompt).toContain("PRD Gate Failed");
     expect(prompt).toContain("set-prd-status");
     expect(prompt).toContain("Do NOT modify code");
+    expect(prompt).toContain("trellis-brainstorm` Step 8");
+    expect(prompt).toContain(
+      "Do not treat an answer to a final clarification/product preference question as PRD confirmation",
+    );
   });
 
   it("[session-current-task] Cursor generic subagents do not receive Trellis jsonl injection", () => {
@@ -3452,6 +3456,13 @@ print(len(entries))
       expect(surface).toContain("`trellis-research`");
       expect(surface).toContain("`{TASK_DIR}/research/*.md`");
       expect(surface).toContain("WebFetch/WebSearch/gh api");
+      expect(surface).toContain("whole-PRD confirmation summary");
+      expect(surface).toContain(
+        "final clarification/product preference question is not PRD confirmation",
+      );
+      expect(surface).toContain(
+        "do NOT run `set-prd-status confirmed` in that same turn",
+      );
     }
   });
 
@@ -3473,6 +3484,61 @@ print(len(entries))
     expect(content).toContain(
       "persist findings to `{TASK_DIR}/research/<topic-slug>.md`",
     );
+  });
+
+  it("[prd-confirmation-guard] brainstorm guidance rejects sub-question answers as PRD confirmation", () => {
+    const commonBrainstorm = getSkillTemplates().find(
+      (template) => template.name === "brainstorm",
+    )?.content;
+    expect(commonBrainstorm).toBeTruthy();
+
+    const templateRoot = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "src",
+      "templates",
+    );
+    const surfaces = [
+      ["common", commonBrainstorm ?? ""],
+      [
+        "codex",
+        fs.readFileSync(
+          path.join(templateRoot, "codex", "skills", "brainstorm", "SKILL.md"),
+          "utf-8",
+        ),
+      ],
+      [
+        "copilot",
+        fs.readFileSync(
+          path.join(templateRoot, "copilot", "prompts", "brainstorm.prompt.md"),
+          "utf-8",
+        ),
+      ],
+    ] as const;
+
+    for (const [label, content] of surfaces) {
+      expect(content, `${label} brainstorm guidance`).toContain(
+        "whole-PRD structured summary and an explicit user choice",
+      );
+      expect(content, `${label} brainstorm guidance`).toContain(
+        "Answering a final clarification, product preference, or other sub-question only resolves that local question",
+      );
+      expect(content, `${label} brainstorm guidance`).toContain(
+        "it is not whole-PRD confirmation",
+      );
+      expect(content, `${label} brainstorm guidance`).toContain(
+        "Do not run `python3 ./.trellis/scripts/task.py set-prd-status <task-dir> confirmed` in the same turn",
+      );
+      expect(content, `${label} brainstorm guidance`).toContain(
+        "unless that same user message explicitly confirms the whole PRD",
+      );
+      expect(content, `${label} brainstorm guidance`).toContain(
+        "distinct confirm, revise, or override choice",
+      );
+      expect(content, `${label} brainstorm guidance`).not.toContain(
+        "Does this look correct? If yes, I'll proceed with implementation.",
+      );
+    }
   });
 
   it("[workflow-state-r3-no_task] template workflow.md [workflow-state:no_task] block is present and well-formed", () => {

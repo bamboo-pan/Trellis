@@ -324,8 +324,11 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
         return (
             f"Status: PLANNING (PRD confirmation)\nTask: {task_title}\n"
             f"Source: {active.source}\n"
-            "Next-Action: send the structured PRD confirmation summary from `trellis-brainstorm` Step 8, "
-            "then wait for the user's explicit choice: confirm, revise, or skip confirmation. "
+            "Next-Action: use `trellis-brainstorm` Step 8 to present a whole-PRD confirmation summary, "
+            "then wait for a distinct user choice: confirm, revise, or override. "
+            "A local answer to a final clarification/product preference question is not PRD confirmation; "
+            "do NOT run `set-prd-status confirmed` in that same turn unless the same user message "
+            "explicitly confirms the whole PRD. "
             "Record the result with `python3 ./.trellis/scripts/task.py set-prd-status <task-dir> confirmed` "
             "or `... override` before entering implementation. Do NOT dispatch `trellis-implement` yet."
         )

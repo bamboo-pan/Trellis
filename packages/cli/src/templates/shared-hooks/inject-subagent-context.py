@@ -399,7 +399,8 @@ Implementation may proceed only when `prd_status` is `confirmed` or `override`.
 ## Required Behavior
 
 - Do NOT modify code.
-- Tell the main session/user: 当前任务 PRD 尚未确认，不能进入实现。请先完成用户确认，或由用户明确表示跳过确认直接实现。
+- Tell the main session/user to return to `trellis-brainstorm` Step 8, present a whole-PRD confirmation summary, and get a distinct confirm/revise/override choice before implementation.
+- Do not treat an answer to a final clarification/product preference question as PRD confirmation.
 - Mention the recording command: `python3 ./.trellis/scripts/task.py set-prd-status <task-dir> confirmed` or `... override`.
 
 ## Original Request

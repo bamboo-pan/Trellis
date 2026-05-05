@@ -1,0 +1,3 @@
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Verify CLI/template changes remain minimal, consistent, and lint-safe."}
+{"file":".trellis/spec/cli/backend/workflow-state-contract.md","reason":"Check workflow-state breadcrumb wording still covers required planning behavior."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Validate regression tests assert meaningful generated guidance behavior."}

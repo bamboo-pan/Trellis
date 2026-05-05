@@ -1,0 +1,9 @@
+{
+  "version": "0.5.0-rc.3",
+  "description": "Publishes the bamboo-pan fork package identity as `@bamboo-pan/trellis` with fork README packaging and npm release metadata. No new migrations.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fork Distribution:**\n- Publish the CLI as `@bamboo-pan/trellis` with repository, homepage, issue tracker, workspace scripts, CI, and release checks targeting the fork package.\n- Copy `README_FORK.md`, `README_FORK_CN.md`, and the repository license into the package during `prepublishOnly` so the npm page documents fork-only distribution changes.\n\n**Verification Notes:**\n- Typecheck and build passed for the fork package.\n- Full tests and lint had known pre-existing Windows/CRLF and unused-import failures unrelated to the fork package identity.",
+  "migrations": [],
+  "notes": "RC install: `npm install -g @bamboo-pan/trellis@rc`. Projects on 0.5 beta or earlier rc can run `trellis update`; rc.3 adds no migration entries."
+}

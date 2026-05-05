@@ -59,6 +59,18 @@ def _has_curated_jsonl_entry(jsonl_path: Path) -> bool:
     return False
 
 
+def _get_prd_status(task_data: dict) -> str:
+    meta = task_data.get("meta")
+    if isinstance(meta, dict):
+        value = meta.get("prd_status")
+        if value in ("draft", "confirmed", "override"):
+            return value
+    status = task_data.get("status")
+    if status in ("in_progress", "completed"):
+        return "confirmed"
+    return "draft"
+
+
 def should_skip_injection() -> bool:
     """Check if any platform's non-interactive flag is set."""
     non_interactive_vars = [
@@ -303,6 +315,26 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             "`python3 ./.trellis/scripts/get_context.py --mode packages` to list available specs, "
             "then edit the jsonl files or use `python3 ./.trellis/scripts/task.py add-context`. "
             "See `.trellis/workflow.md` Phase 1.3 for details."
+        )
+
+    prd_status = _get_prd_status(task_data)
+    if prd_status == "draft":
+        return (
+            f"Status: PLANNING (PRD confirmation)\nTask: {task_title}\n"
+            f"Source: {active.source}\n"
+            "Next-Action: use `trellis-brainstorm` Step 8 to present a whole-PRD confirmation summary, "
+            "then wait for a distinct user choice: confirm, revise, or override. "
+            "A local answer to a final clarification/product preference question is not PRD confirmation; "
+            "do NOT run `set-prd-status confirmed` in that same turn unless the same user message "
+            "explicitly confirms the whole PRD."
+        )
+
+    if task_status == "planning":
+        return (
+            f"Status: PLANNING (Phase 1.4)\nTask: {task_title}\n"
+            f"Source: {active.source}\n"
+            f"Next-Action: run `python3 ./.trellis/scripts/task.py start {task_dir.name}` to enter Phase 2. "
+            f"The PRD gate is already satisfied (`prd_status={prd_status}`)."
         )
 
     # Case 5: PRD + curated jsonl (or agent-less platform with no jsonl) — enter Execute phase
