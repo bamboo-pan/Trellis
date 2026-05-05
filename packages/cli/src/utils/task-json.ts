@@ -10,11 +10,51 @@
  */
 
 export type PrdStatus = "draft" | "confirmed" | "override";
+export type WorkflowStep =
+  | "awaiting_implement"
+  | "awaiting_check"
+  | "awaiting_spec_review"
+  | "awaiting_commit"
+  | "ready_to_finish";
+export type WorkflowVcsKind = "git" | "non-git" | "unknown";
+
+export interface TaskWorkflowVcs extends Record<string, unknown> {
+  kind: WorkflowVcsKind;
+  commit_required: boolean;
+}
+
+export interface TaskWorkflowState extends Record<string, unknown> {
+  version: 1;
+  current_step: WorkflowStep;
+  vcs: TaskWorkflowVcs;
+  implement: {
+    dispatched_at: string | null;
+    completed_at: string | null;
+  };
+  check: {
+    completed_at: string | null;
+    fingerprint: string | null;
+    head: string | null;
+  };
+  spec_update: {
+    reviewed_at: string | null;
+    result: "updated" | "noop" | null;
+  };
+  commit: {
+    hash: string | null;
+    recorded_at: string | null;
+  };
+}
 
 export interface TaskMeta extends Record<string, unknown> {
   prd_status: PrdStatus;
   linear_issue?: string;
+  workflow?: TaskWorkflowState;
 }
+
+export type TaskJsonOverrides = Partial<Omit<TaskJson, "meta">> & {
+  meta?: Partial<TaskMeta> & Record<string, unknown>;
+};
 
 export interface TaskJson {
   id: string;
@@ -51,8 +91,37 @@ export interface TaskJson {
  * createdAt, etc.) and leave null-default fields untouched unless they have a
  * real value.
  */
-export function emptyTaskJson(overrides: Partial<TaskJson> = {}): TaskJson {
+function emptyWorkflowState(): TaskWorkflowState {
+  return {
+    version: 1,
+    current_step: "awaiting_implement",
+    vcs: {
+      kind: "unknown",
+      commit_required: false,
+    },
+    implement: {
+      dispatched_at: null,
+      completed_at: null,
+    },
+    check: {
+      completed_at: null,
+      fingerprint: null,
+      head: null,
+    },
+    spec_update: {
+      reviewed_at: null,
+      result: null,
+    },
+    commit: {
+      hash: null,
+      recorded_at: null,
+    },
+  };
+}
+
+export function emptyTaskJson(overrides: TaskJsonOverrides = {}): TaskJson {
   const today = new Date().toISOString().split("T")[0];
+  const workflow = emptyWorkflowState();
   const base: TaskJson = {
     id: "",
     name: "",
@@ -77,7 +146,16 @@ export function emptyTaskJson(overrides: Partial<TaskJson> = {}): TaskJson {
     parent: null,
     relatedFiles: [],
     notes: "",
-    meta: { prd_status: "draft" },
+    meta: { prd_status: "draft", workflow },
   };
-  return { ...base, ...overrides };
+  const metaOverrides = overrides.meta ?? {};
+  return {
+    ...base,
+    ...overrides,
+    meta: {
+      ...base.meta,
+      ...metaOverrides,
+      workflow: metaOverrides.workflow ?? workflow,
+    },
+  };
 }

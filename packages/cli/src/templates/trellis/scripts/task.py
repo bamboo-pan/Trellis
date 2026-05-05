@@ -9,6 +9,8 @@ Usage:
     python3 task.py validate <dir>              # Validate jsonl files
     python3 task.py list-context <dir>          # List jsonl entries
     python3 task.py set-prd-status <dir> <status> # Set PRD confirmation state
+    python3 task.py workflow mark <dir> <event> # Record workflow event
+    python3 task.py workflow guard <dir> <action> # Check workflow gate
     python3 task.py start <dir>                 # Set active task
     python3 task.py current [--source]          # Show active task
     python3 task.py finish                      # Clear active task
@@ -52,6 +54,15 @@ from common.prd_status import (
 )
 from common.task_utils import resolve_task_dir, run_task_hooks
 from common.tasks import iter_active_tasks, children_progress
+from common.workflow_state import (
+    WORKFLOW_ACTIONS,
+    WORKFLOW_EVENTS,
+    WorkflowError,
+    ensure_workflow_for_start,
+    ensure_workflow_state,
+    guard_workflow_action,
+    mark_workflow_event,
+)
 
 # Import command handlers from split modules (also re-exports for plan.py compatibility)
 from common.task_store import (
@@ -105,58 +116,82 @@ def cmd_start(args: argparse.Namespace) -> int:
         )
         return 1
 
+    task_json_path = full_path / FILE_TASK_JSON
+    data = read_json(task_json_path) if task_json_path.is_file() else None
+    status_message = None
+
+    if data:
+        if data.get("status") == "completed":
+            print(colored("Error: Completed tasks cannot be started.", Colors.RED))
+            return 1
+
+        if data.get("status") == "planning" and not can_enter_implementation(data):
+            prd_status = get_prd_status(data)
+            print(
+                colored(
+                    "Error: Cannot enter implementation while PRD is unconfirmed.",
+                    Colors.RED,
+                )
+            )
+            print(f"Current prd_status: {prd_status}")
+            print(
+                "Next step: confirm the PRD with the user, then run "
+                "`python3 ./.trellis/scripts/task.py set-prd-status <dir> confirmed` "
+                "or `... override` before `task.py start`."
+            )
+            return 1
+
+        if data.get("status") == "planning":
+            ensure_workflow_for_start(data, repo_root)
+            data["status"] = "in_progress"
+            status_message = "✓ Status: planning → in_progress"
+        else:
+            ensure_workflow_state(data, repo_root)
+
+        if not write_json(task_json_path, data):
+            print(colored(f"Error: failed to write task.json: {task_json_path}", Colors.RED))
+            return 1
+
     active = set_active_task(task_dir, repo_root)
-    if active:
-        print(colored(f"✓ Current task set to: {task_dir}", Colors.GREEN))
-        print(f"Source: {active.source}")
-
-        task_json_path = full_path / FILE_TASK_JSON
-        if task_json_path.is_file():
-            data = read_json(task_json_path)
-            if data:
-                if data.get("status") == "planning" and not can_enter_implementation(data):
-                    prd_status = get_prd_status(data)
-                    print(
-                        colored(
-                            "Error: Cannot enter implementation while PRD is unconfirmed.",
-                            Colors.RED,
-                        )
-                    )
-                    print(f"Current prd_status: {prd_status}")
-                    print(
-                        "Next step: confirm the PRD with the user, then run "
-                        "`python3 ./.trellis/scripts/task.py set-prd-status <dir> confirmed` "
-                        "or `... override` before `task.py start`."
-                    )
-                    return 1
-
-                if data.get("status") == "planning":
-                    data["status"] = "in_progress"
-                    if write_json(task_json_path, data):
-                        print(colored("✓ Status: planning → in_progress", Colors.GREEN))
-
-        print()
-        print(colored("The hook will now inject context from this task's jsonl files.", Colors.BLUE))
-
-        run_task_hooks("after_start", task_json_path, repo_root)
-        return 0
-    else:
+    if not active:
         print(colored("Error: Failed to set current task", Colors.RED))
         return 1
+
+    print(colored(f"✓ Current task set to: {task_dir}", Colors.GREEN))
+    print(f"Source: {active.source}")
+    if status_message:
+        print(colored(status_message, Colors.GREEN))
+
+    print()
+    print(colored("The hook will now inject context from this task's jsonl files.", Colors.BLUE))
+
+    run_task_hooks("after_start", task_json_path, repo_root)
+    return 0
 
 
 def cmd_finish(args: argparse.Namespace) -> int:
     """Clear active task."""
     repo_root = get_repo_root()
-    active = clear_active_task(repo_root)
+    active = resolve_active_task(repo_root)
     current = active.task_path
 
     if not current:
         print(colored("No current task set", Colors.YELLOW))
         return 0
 
-    # Resolve task.json path before clearing
     task_json_path = repo_root / current / FILE_TASK_JSON
+    if task_json_path.is_file():
+        try:
+            guard = guard_workflow_action(task_json_path, repo_root, "finish")
+        except WorkflowError as error:
+            print(colored(f"Error: {error}", Colors.RED))
+            return 1
+        if not guard.allowed:
+            print(colored(f"Error: {guard.message}", Colors.RED))
+            print(f"Current workflow step: {guard.current_step}")
+            return 1
+
+    active = clear_active_task(repo_root)
 
     print(colored(f"✓ Cleared current task (was: {current})", Colors.GREEN))
     print(f"Source: {active.source}")
@@ -222,6 +257,49 @@ def cmd_set_prd_status(args: argparse.Namespace) -> int:
 
     print(colored(f"✓ PRD status: {old_value} → {args.status}", Colors.GREEN))
     return 0
+
+
+def cmd_workflow(args: argparse.Namespace) -> int:
+    """Record or check fine-grained workflow state."""
+    repo_root = get_repo_root()
+    task_input = getattr(args, "dir", None)
+
+    if not task_input:
+        print(colored("Error: task directory or name required", Colors.RED))
+        return 1
+
+    full_path = resolve_task_dir(task_input, repo_root)
+    if not full_path.is_dir():
+        print(colored(f"Error: Task not found: {task_input}", Colors.RED))
+        return 1
+
+    task_json_path = full_path / FILE_TASK_JSON
+    if not task_json_path.is_file():
+        print(colored(f"Error: task.json not found: {full_path}", Colors.RED))
+        return 1
+
+    try:
+        if args.workflow_command == "mark":
+            workflow = mark_workflow_event(task_json_path, repo_root, args.event)
+            print(colored(f"✓ Workflow event recorded: {args.event}", Colors.GREEN))
+            print(f"Current workflow step: {workflow.get('current_step')}")
+            return 0
+
+        if args.workflow_command == "guard":
+            result = guard_workflow_action(task_json_path, repo_root, args.action)
+            if not result.allowed:
+                print(colored(f"Error: {result.message}", Colors.RED))
+                print(f"Current workflow step: {result.current_step}")
+                return 1
+            print(colored(f"✓ {result.message}", Colors.GREEN))
+            print(f"Current workflow step: {result.current_step}")
+            return 0
+    except WorkflowError as error:
+        print(colored(f"Error: {error}", Colors.RED))
+        return 1
+
+    print(colored("Error: workflow subcommand required", Colors.RED))
+    return 1
 
 
 # =============================================================================
@@ -355,6 +433,8 @@ Usage:
   python3 task.py validate <dir>                     Validate jsonl files
   python3 task.py list-context <dir>                 List jsonl entries
     python3 task.py set-prd-status <dir> <status>      Set PRD confirmation state
+    python3 task.py workflow mark <dir> <event>        Record workflow event
+    python3 task.py workflow guard <dir> <action>      Check workflow gate
   python3 task.py start <dir>                        Set active task
   python3 task.py current [--source]                 Show active task
   python3 task.py finish                             Clear active task
@@ -380,6 +460,8 @@ Examples:
   python3 task.py create "Child task" --slug child --parent .trellis/tasks/01-21-parent
   python3 task.py add-context <dir> implement .trellis/spec/cli/backend/auth.md "Auth guidelines"
     python3 task.py set-prd-status add-login confirmed
+    python3 task.py workflow mark add-login implement-completed
+    python3 task.py workflow guard add-login finish
   python3 task.py set-branch <dir> task/add-login
   python3 task.py start .trellis/tasks/01-21-add-login
   python3 task.py current --source
@@ -465,6 +547,16 @@ def main() -> int:
     p_prd.add_argument("dir", help="Task directory")
     p_prd.add_argument("status", choices=PRD_STATUS_VALUES, help="PRD status")
 
+    # workflow
+    p_workflow = subparsers.add_parser("workflow", help="Manage fine-grained workflow state")
+    workflow_subparsers = p_workflow.add_subparsers(dest="workflow_command", help="Workflow commands")
+    p_workflow_mark = workflow_subparsers.add_parser("mark", help="Record workflow event")
+    p_workflow_mark.add_argument("dir", help="Task directory")
+    p_workflow_mark.add_argument("event", choices=WORKFLOW_EVENTS, help="Workflow event")
+    p_workflow_guard = workflow_subparsers.add_parser("guard", help="Check workflow gate")
+    p_workflow_guard.add_argument("dir", help="Task directory")
+    p_workflow_guard.add_argument("action", choices=WORKFLOW_ACTIONS, help="Workflow action")
+
     # start
     p_start = subparsers.add_parser("start", help="Set active task")
     p_start.add_argument("dir", help="Task directory")
@@ -528,6 +620,7 @@ def main() -> int:
         "validate": cmd_validate,
         "list-context": cmd_list_context,
         "set-prd-status": cmd_set_prd_status,
+        "workflow": cmd_workflow,
         "start": cmd_start,
         "current": cmd_current,
         "finish": cmd_finish,

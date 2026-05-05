@@ -18,11 +18,32 @@ from typing import TypedDict
 # task.json shape (TypedDict — used only for read-path type hints)
 # =============================================================================
 
+class WorkflowVcs(TypedDict, total=False):
+    """Known keys stored under task.json ``meta.workflow.vcs``."""
+
+    kind: str
+    commit_required: bool
+
+
+class WorkflowState(TypedDict, total=False):
+    """Known keys stored under task.json ``meta.workflow``."""
+
+    version: int
+    current_step: str
+    vcs: WorkflowVcs
+    implement: dict
+    check: dict
+    spec_update: dict
+    commit: dict
+
+
 class TaskMeta(TypedDict, total=False):
     """Known keys stored under task.json ``meta``."""
 
     prd_status: str
     linear_issue: str
+    workflow: WorkflowState
+
 
 class TaskData(TypedDict, total=False):
     """Shape of task.json on disk.

@@ -998,6 +998,76 @@ describe("regression: current-task path normalization", () => {
     });
   }
 
+  interface CommandResult {
+    status: number;
+    output: string;
+  }
+
+  function taskCommand(args: string[]): string {
+    const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
+    const renderedArgs = args.map((arg) => JSON.stringify(arg)).join(" ");
+    return `${pythonCmd} ${JSON.stringify(taskScriptPath)} ${renderedArgs}`;
+  }
+
+  function runTaskCommand(
+    args: string[],
+    envOverrides: NodeJS.ProcessEnv = {},
+  ): string {
+    return execSync(taskCommand(args), {
+      cwd: tmpDir,
+      encoding: "utf-8",
+      env: sessionEnv(envOverrides),
+    });
+  }
+
+  function runTaskCommandResult(
+    args: string[],
+    envOverrides: NodeJS.ProcessEnv = {},
+  ): CommandResult {
+    try {
+      return {
+        status: 0,
+        output: runTaskCommand(args, envOverrides),
+      };
+    } catch (error) {
+      const commandError = error as {
+        status?: unknown;
+        stdout?: unknown;
+        stderr?: unknown;
+      };
+      return {
+        status:
+          typeof commandError.status === "number" ? commandError.status : 1,
+        output: `${String(commandError.stdout ?? "")}${String(commandError.stderr ?? "")}`,
+      };
+    }
+  }
+
+  function prepareNonGitTaskReadyToFinish(relTaskDir: string): void {
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "spec-reviewed-noop"]);
+  }
+
+  function initGitRepo(): void {
+    execSync("git init", { cwd: tmpDir, encoding: "utf-8" });
+    execSync("git config user.email test@example.com", {
+      cwd: tmpDir,
+      encoding: "utf-8",
+    });
+    execSync("git config user.name Test", {
+      cwd: tmpDir,
+      encoding: "utf-8",
+    });
+  }
+
+  function gitHead(): string {
+    return execSync("git rev-parse HEAD", {
+      cwd: tmpDir,
+      encoding: "utf-8",
+    }).trim();
+  }
+
   function expectTemplateContent(
     content: string | undefined,
     label: string,
@@ -1091,6 +1161,8 @@ describe("regression: current-task path normalization", () => {
       },
     );
     expect(fs.existsSync(contextPath)).toBe(true);
+
+    prepareNonGitTaskReadyToFinish(".trellis/tasks/issue-106");
 
     const output = execSync(`${pythonCmd} ${JSON.stringify(taskScriptPath)} finish`, {
       cwd: tmpDir,
@@ -1284,7 +1356,7 @@ describe("regression: current-task path normalization", () => {
       {
         cwd: tmpDir,
         encoding: "utf-8",
-        env: sessionEnv({ TRELLIS_CONTEXT_ID: "prd-gate-session" }),
+        env: sessionEnv(),
       },
     );
 
@@ -1300,6 +1372,7 @@ describe("regression: current-task path normalization", () => {
       taskDir as string,
       "task.json",
     );
+    const beforeBlockedStart = fs.readFileSync(taskJsonPath, "utf-8");
 
     let startStatus = 0;
     let startOutput = "";
@@ -1321,6 +1394,18 @@ describe("regression: current-task path normalization", () => {
     expect(startStatus).toBe(1);
     expect(startOutput).toContain("Cannot enter implementation while PRD is unconfirmed");
     expect(startOutput).toContain("set-prd-status");
+    expect(
+      fs.existsSync(
+        path.join(
+          tmpDir,
+          ".trellis",
+          ".runtime",
+          "sessions",
+          "prd-gate-session.json",
+        ),
+      ),
+    ).toBe(false);
+    expect(fs.readFileSync(taskJsonPath, "utf-8")).toBe(beforeBlockedStart);
 
     const blockedTask = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
       status: string;
@@ -1355,6 +1440,448 @@ describe("regression: current-task path normalization", () => {
     };
     expect(afterStart.status).toBe("in_progress");
     expect(afterStart.meta?.prd_status).toBe("confirmed");
+  });
+
+  it("[workflow-state-machine] task.py create/start persist workflow defaults and PRD state", () => {
+    writeTrellisScripts();
+    writeProjectFile(
+      path.join(".trellis", ".developer"),
+      "name=test-dev\ninitialized_at=2026-03-27T00:00:00\n",
+    );
+    writeProjectFile(path.join(".trellis", "workflow.md"), "# Workflow\n");
+
+    runTaskCommand([
+      "create",
+      "workflow init",
+      "--slug",
+      "workflow-init",
+      "--assignee",
+      "test-dev",
+    ]);
+
+    const taskDir = fs
+      .readdirSync(path.join(tmpDir, ".trellis", "tasks"))
+      .find((d) => d.includes("workflow-init"));
+    expect(taskDir).toBeDefined();
+    const relTaskDir = path.posix.join(".trellis", "tasks", taskDir as string);
+    const taskJsonPath = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      taskDir as string,
+      "task.json",
+    );
+
+    const created = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      status: string;
+      meta?: {
+        prd_status?: string;
+        workflow?: {
+          version?: number;
+          current_step?: string;
+          vcs?: { kind?: string; commit_required?: boolean };
+        };
+      };
+    };
+    expect(created.status).toBe("planning");
+    expect(created.meta?.prd_status).toBe("draft");
+    expect(created.meta?.workflow?.version).toBe(1);
+    expect(created.meta?.workflow?.current_step).toBe("awaiting_implement");
+    expect(created.meta?.workflow?.vcs).toEqual({
+      kind: "non-git",
+      commit_required: false,
+    });
+
+    const blockedStartGuard = runTaskCommandResult([
+      "workflow",
+      "guard",
+      relTaskDir,
+      "start",
+    ]);
+    expect(blockedStartGuard.status).toBe(1);
+    expect(blockedStartGuard.output).toContain("prd_status=draft");
+
+    runTaskCommand(["set-prd-status", relTaskDir, "confirmed"]);
+    runTaskCommand(["start", relTaskDir], {
+      TRELLIS_CONTEXT_ID: "workflow-init-session",
+    });
+
+    const started = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      status: string;
+      meta?: { prd_status?: string; workflow?: { current_step?: string } };
+    };
+    expect(started.status).toBe("in_progress");
+    expect(started.meta?.prd_status).toBe("confirmed");
+    expect(started.meta?.workflow?.current_step).toBe("awaiting_implement");
+  });
+
+  it("[workflow-state-machine] workflow mark advances legal non-git transitions and preserves unknown fields", () => {
+    setupTaskRepo();
+    const relTaskDir = ".trellis/tasks/issue-106";
+    const taskJsonPath = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "issue-106",
+      "task.json",
+    );
+    const original = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as Record<string, unknown>;
+    original.custom_root = "keep";
+    original.meta = { prd_status: "confirmed", custom_meta: "keep" };
+    fs.writeFileSync(taskJsonPath, JSON.stringify(original, null, 2));
+
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-dispatched"]);
+    const dispatched = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      custom_root?: string;
+      meta?: {
+        custom_meta?: string;
+        workflow?: {
+          current_step?: string;
+          implement?: { dispatched_at?: string | null };
+        };
+      };
+    };
+    expect(dispatched.custom_root).toBe("keep");
+    expect(dispatched.meta?.custom_meta).toBe("keep");
+    expect(dispatched.meta?.workflow?.current_step).toBe("awaiting_implement");
+    expect(typeof dispatched.meta?.workflow?.implement?.dispatched_at).toBe("string");
+
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-completed"]);
+    let data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: { workflow?: { current_step?: string } };
+    };
+    expect(data.meta?.workflow?.current_step).toBe("awaiting_check");
+
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+    data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: {
+        workflow?: {
+          current_step?: string;
+          check?: { fingerprint?: string | null; head?: string | null };
+        };
+      };
+    };
+    expect(data.meta?.workflow?.current_step).toBe("awaiting_spec_review");
+    expect(typeof data.meta?.workflow?.check?.fingerprint).toBe("string");
+    expect(data.meta?.workflow?.check?.head).toBeNull();
+
+    runTaskCommand(["workflow", "mark", relTaskDir, "spec-reviewed-noop"]);
+    data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: { workflow?: { current_step?: string; spec_update?: { result?: string | null } } };
+    };
+    expect(data.meta?.workflow?.current_step).toBe("ready_to_finish");
+    expect(data.meta?.workflow?.spec_update?.result).toBe("noop");
+
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "finish"]).status).toBe(0);
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "commit"]).output).toContain(
+      "Commit is not required",
+    );
+  });
+
+  it("[workflow-state-machine] check-completed repeats from awaiting_spec_review and refreshes freshness", () => {
+    setupTaskRepo();
+    const relTaskDir = ".trellis/tasks/issue-106";
+    const taskJsonPath = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "issue-106",
+      "task.json",
+    );
+
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+
+    let data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: { workflow?: { current_step?: string; check?: { fingerprint?: string | null } } };
+    };
+    const beforeFingerprint = data.meta?.workflow?.check?.fingerprint;
+    expect(data.meta?.workflow?.current_step).toBe("awaiting_spec_review");
+    expect(typeof beforeFingerprint).toBe("string");
+
+    writeProjectFile(path.join(".trellis", "spec", "guides", "index.md"), "# Guides\n\nupdated\n");
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+
+    data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: { workflow?: { current_step?: string; check?: { fingerprint?: string | null } } };
+    };
+    expect(data.meta?.workflow?.current_step).toBe("awaiting_spec_review");
+    expect(typeof data.meta?.workflow?.check?.fingerprint).toBe("string");
+    expect(data.meta?.workflow?.check?.fingerprint).not.toBe(beforeFingerprint);
+  });
+
+  it("[workflow-state-machine] check-completed repeats from non-git ready_to_finish and stays ready", () => {
+    setupTaskRepo();
+    const relTaskDir = ".trellis/tasks/issue-106";
+    const taskJsonPath = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "issue-106",
+      "task.json",
+    );
+
+    prepareNonGitTaskReadyToFinish(relTaskDir);
+    const before = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: { workflow?: { check?: { fingerprint?: string | null } } };
+    };
+    const beforeFingerprint = before.meta?.workflow?.check?.fingerprint;
+
+    writeProjectFile(path.join(".trellis", "spec", "guides", "index.md"), "# Guides\n\nready update\n");
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+
+    const after = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: {
+        workflow?: {
+          current_step?: string;
+          check?: { fingerprint?: string | null };
+        };
+      };
+    };
+    expect(after.meta?.workflow?.current_step).toBe("ready_to_finish");
+    expect(after.meta?.workflow?.check?.fingerprint).not.toBe(beforeFingerprint);
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "finish"]).status).toBe(0);
+  });
+
+  it("[workflow-state-machine] workflow mark rejects illegal transitions without mutating task JSON", () => {
+    setupTaskRepo();
+    const relTaskDir = ".trellis/tasks/issue-106";
+    const taskJsonPath = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "issue-106",
+      "task.json",
+    );
+    const before = fs.readFileSync(taskJsonPath, "utf-8");
+
+    const result = runTaskCommandResult([
+      "workflow",
+      "mark",
+      relTaskDir,
+      "check-completed",
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("expected awaiting_check");
+    expect(fs.readFileSync(taskJsonPath, "utf-8")).toBe(before);
+  });
+
+  it("[workflow-state-machine] git repositories require commit recording before finish/archive", () => {
+    setupTaskRepo();
+    writeProjectFile(path.join("src", "app.txt"), "v1\n");
+    initGitRepo();
+    execSync("git add src/app.txt", { cwd: tmpDir, encoding: "utf-8" });
+    execSync('git commit -m "initial"', { cwd: tmpDir, encoding: "utf-8" });
+    writeProjectFile(path.join("src", "app.txt"), "v2\n");
+
+    const relTaskDir = ".trellis/tasks/issue-106";
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "spec-reviewed-updated"]);
+
+    const taskJsonPath = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "issue-106",
+      "task.json",
+    );
+    let data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: { workflow?: { current_step?: string; vcs?: { kind?: string; commit_required?: boolean } } };
+    };
+    expect(data.meta?.workflow?.current_step).toBe("awaiting_commit");
+    expect(data.meta?.workflow?.vcs).toEqual({
+      kind: "git",
+      commit_required: true,
+    });
+
+    const blockedFinish = runTaskCommandResult(["workflow", "guard", relTaskDir, "finish"]);
+    expect(blockedFinish.status).toBe(1);
+    expect(blockedFinish.output).toContain("ready_to_finish");
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "commit"]).status).toBe(0);
+
+    execSync("git add src/app.txt", { cwd: tmpDir, encoding: "utf-8" });
+    execSync('git commit -m "work"', { cwd: tmpDir, encoding: "utf-8" });
+    const head = gitHead();
+    runTaskCommand(["workflow", "mark", relTaskDir, "commit-recorded"]);
+
+    data = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: { workflow?: { current_step?: string; commit?: { hash?: string | null } } };
+    };
+    expect(data.meta?.workflow?.current_step).toBe("ready_to_finish");
+    expect(data.meta?.workflow?.commit?.hash).toBe(head);
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "finish"]).status).toBe(0);
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "archive"]).status).toBe(0);
+  });
+
+  it("[workflow-state-machine] check-completed after git ready_to_finish clears recorded commit", () => {
+    setupTaskRepo();
+    writeProjectFile(path.join("src", "app.txt"), "v1\n");
+    initGitRepo();
+    execSync("git add src/app.txt", { cwd: tmpDir, encoding: "utf-8" });
+    execSync('git commit -m "initial"', { cwd: tmpDir, encoding: "utf-8" });
+    writeProjectFile(path.join("src", "app.txt"), "v2\n");
+
+    const relTaskDir = ".trellis/tasks/issue-106";
+    const taskJsonPath = path.join(
+      tmpDir,
+      ".trellis",
+      "tasks",
+      "issue-106",
+      "task.json",
+    );
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "spec-reviewed-noop"]);
+    execSync("git add src/app.txt", { cwd: tmpDir, encoding: "utf-8" });
+    execSync('git commit -m "work"', { cwd: tmpDir, encoding: "utf-8" });
+    const recordedHead = gitHead();
+    runTaskCommand(["workflow", "mark", relTaskDir, "commit-recorded"]);
+
+    const before = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: {
+        workflow?: {
+          current_step?: string;
+          check?: { fingerprint?: string | null };
+          commit?: { hash?: string | null; recorded_at?: string | null };
+        };
+      };
+    };
+    const beforeFingerprint = before.meta?.workflow?.check?.fingerprint;
+    expect(before.meta?.workflow?.current_step).toBe("ready_to_finish");
+    expect(before.meta?.workflow?.commit?.hash).toBe(recordedHead);
+
+    writeProjectFile(path.join(".trellis", "spec", "guides", "index.md"), "# Guides\n\ngit update\n");
+    const staleFinish = runTaskCommandResult(["workflow", "guard", relTaskDir, "finish"]);
+    expect(staleFinish.status).toBe(1);
+    expect(staleFinish.output).toContain("Code-relevant changes occurred");
+
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+    const after = JSON.parse(fs.readFileSync(taskJsonPath, "utf-8")) as {
+      meta?: {
+        workflow?: {
+          current_step?: string;
+          check?: { fingerprint?: string | null };
+          commit?: { hash?: string | null; recorded_at?: string | null };
+        };
+      };
+    };
+    expect(after.meta?.workflow?.current_step).toBe("awaiting_commit");
+    expect(after.meta?.workflow?.check?.fingerprint).not.toBe(beforeFingerprint);
+    expect(after.meta?.workflow?.commit?.hash).toBeNull();
+    expect(after.meta?.workflow?.commit?.recorded_at).toBeNull();
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "finish"]).status).toBe(1);
+  });
+
+  it("[workflow-state-machine] finish and archive guards reject stale recorded git HEAD", () => {
+    setupTaskRepo();
+    writeProjectFile(path.join("src", "app.txt"), "v1\n");
+    initGitRepo();
+    execSync("git add src/app.txt", { cwd: tmpDir, encoding: "utf-8" });
+    execSync('git commit -m "initial"', { cwd: tmpDir, encoding: "utf-8" });
+    writeProjectFile(path.join("src", "app.txt"), "v2\n");
+
+    const relTaskDir = ".trellis/tasks/issue-106";
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "spec-reviewed-noop"]);
+    execSync("git add src/app.txt", { cwd: tmpDir, encoding: "utf-8" });
+    execSync('git commit -m "work"', { cwd: tmpDir, encoding: "utf-8" });
+    const recordedHead = gitHead();
+    runTaskCommand(["workflow", "mark", relTaskDir, "commit-recorded"]);
+
+    writeProjectFile(path.join(".trellis", "tasks", "issue-106", "bookkeeping.txt"), "head only\n");
+    execSync("git add .trellis/tasks/issue-106/bookkeeping.txt", {
+      cwd: tmpDir,
+      encoding: "utf-8",
+    });
+    execSync('git commit -m "bookkeeping"', { cwd: tmpDir, encoding: "utf-8" });
+    expect(gitHead()).not.toBe(recordedHead);
+
+    const finish = runTaskCommandResult(["workflow", "guard", relTaskDir, "finish"]);
+    expect(finish.status).toBe(1);
+    expect(finish.output).toContain("Recorded git commit is stale");
+    expect(finish.output).toContain("commit-recorded");
+
+    const archive = runTaskCommandResult(["workflow", "guard", relTaskDir, "archive"]);
+    expect(archive.status).toBe(1);
+    expect(archive.output).toContain("Recorded git commit is stale");
+    expect(archive.output).toContain("commit-recorded");
+  });
+
+  it("[workflow-state-machine] commit guard ignores Trellis bookkeeping but catches code changes after check", () => {
+    setupTaskRepo();
+    writeProjectFile(path.join("src", "app.txt"), "v1\n");
+    initGitRepo();
+    execSync("git add src/app.txt", { cwd: tmpDir, encoding: "utf-8" });
+    execSync('git commit -m "initial"', { cwd: tmpDir, encoding: "utf-8" });
+    writeProjectFile(path.join("src", "app.txt"), "v2\n");
+
+    const relTaskDir = ".trellis/tasks/issue-106";
+    runTaskCommand(["workflow", "mark", relTaskDir, "implement-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "check-completed"]);
+    runTaskCommand(["workflow", "mark", relTaskDir, "spec-reviewed-noop"]);
+
+    writeProjectFile(path.join(".trellis", "tasks", "issue-106", "bookkeeping.txt"), "changed\n");
+    writeProjectFile(path.join(".trellis", "workspace", "test-dev", "journal-1.md"), "changed\n");
+    writeProjectFile(path.join(".trellis", ".runtime", "sessions", "ignored.json"), "changed\n");
+    expect(runTaskCommandResult(["workflow", "guard", relTaskDir, "commit"]).status).toBe(0);
+
+    writeProjectFile(path.join("src", "app.txt"), "v3\n");
+    const stale = runTaskCommandResult(["workflow", "guard", relTaskDir, "commit"]);
+    expect(stale.status).toBe(1);
+    expect(stale.output).toContain("Code-relevant changes occurred");
+  });
+
+  it("[workflow-state-machine] task.py finish blocks before clearing session state", () => {
+    setupTaskRepo();
+    const contextPath = path.join(
+      tmpDir,
+      ".trellis",
+      ".runtime",
+      "sessions",
+      "blocked-finish.json",
+    );
+    runTaskCommand(["start", ".trellis/tasks/issue-106"], {
+      TRELLIS_CONTEXT_ID: "blocked-finish",
+    });
+    expect(fs.existsSync(contextPath)).toBe(true);
+
+    const result = runTaskCommandResult(["finish"], {
+      TRELLIS_CONTEXT_ID: "blocked-finish",
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("finish is blocked");
+    expect(fs.existsSync(contextPath)).toBe(true);
+  });
+
+  it("[workflow-state-machine] task.py archive blocks before status, move, session cleanup, or auto-commit", () => {
+    setupTaskRepo();
+    const sessionPath = path.join(
+      tmpDir,
+      ".trellis",
+      ".runtime",
+      "sessions",
+      "blocked-archive.json",
+    );
+    writeSessionContext("blocked-archive", ".trellis/tasks/issue-106");
+
+    const result = runTaskCommandResult(["archive", "issue-106", "--no-commit"]);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("archive is blocked");
+    expect(fs.existsSync(path.join(tmpDir, ".trellis", "tasks", "issue-106"))).toBe(true);
+    expect(fs.existsSync(sessionPath)).toBe(true);
+    const data = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpDir, ".trellis", "tasks", "issue-106", "task.json"),
+        "utf-8",
+      ),
+    ) as { status?: string; completedAt?: string | null };
+    expect(data.status).toBe("in_progress");
+    expect(data.completedAt).toBeUndefined();
   });
 
   it("[session-current-task] task.py archive deletes runtime sessions pointing at the archived task", () => {
@@ -1393,6 +1920,7 @@ describe("regression: current-task path normalization", () => {
       path.join(".trellis", ".runtime", "sessions", "session-other.json"),
       JSON.stringify({ current_task: ".trellis/tasks/other-task" }, null, 2),
     );
+    prepareNonGitTaskReadyToFinish(".trellis/tasks/issue-106");
 
     execSync(`${pythonCmd} ${JSON.stringify(taskScriptPath)} archive issue-106 --no-commit`, {
       cwd: tmpDir,
@@ -1424,6 +1952,7 @@ describe("regression: current-task path normalization", () => {
           2,
         ),
       );
+      prepareNonGitTaskReadyToFinish(`.trellis/tasks/${name}`);
     }
 
     // Form 1: bare slug

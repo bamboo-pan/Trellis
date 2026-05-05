@@ -48,6 +48,7 @@ from .task_utils import (
     resolve_task_dir,
     run_task_hooks,
 )
+from .workflow_state import WorkflowError, ensure_workflow_state, guard_workflow_action
 
 
 # =============================================================================
@@ -225,6 +226,7 @@ def cmd_create(args: argparse.Namespace) -> int:
         "notes": "",
         "meta": {"prd_status": PRD_STATUS_DRAFT},
     }
+    ensure_workflow_state(task_data, repo_root)
 
     write_json(task_json_path, task_data)
 
@@ -329,6 +331,20 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
     dir_name = task_dir.name
     task_json_path = task_dir / FILE_TASK_JSON
+
+    if not task_json_path.is_file():
+        print(colored(f"Error: task.json not found: {task_dir}", Colors.RED), file=sys.stderr)
+        return 1
+
+    try:
+        guard = guard_workflow_action(task_json_path, repo_root, "archive")
+    except WorkflowError as error:
+        print(colored(f"Error: {error}", Colors.RED), file=sys.stderr)
+        return 1
+    if not guard.allowed:
+        print(colored(f"Error: {guard.message}", Colors.RED), file=sys.stderr)
+        print(f"Current workflow step: {guard.current_step}", file=sys.stderr)
+        return 1
 
     # Update status before archiving
     today = datetime.now().strftime("%Y-%m-%d")
