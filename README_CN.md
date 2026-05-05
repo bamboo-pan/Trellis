@@ -6,6 +6,8 @@
 </picture>
 </p>
 
+> Fork 分发说明：当前 checkout 正在准备发布为 `@bamboo-pan/trellis` npm 包。请查看 [README_FORK_CN.md](./README_FORK_CN.md) / [README_FORK.md](./README_FORK.md)，了解相对上游项目 https://github.com/mindfold-ai/Trellis 不存在的变化。
+
 <p align="center">
 <strong>给 AI 立规矩的开源框架</strong><br/>
 <sub>支持 Claude Code、Cursor、OpenCode、iFlow、Codex、Kilo、Kiro、Gemini CLI、Antigravity、Windsurf、Qoder、CodeBuddy、GitHub Copilot、Factory Droid 和 Pi Agent。</sub>

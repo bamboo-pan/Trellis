@@ -6,6 +6,8 @@
 </picture>
 </p>
 
+> Fork distribution note: this checkout is being prepared for the `@bamboo-pan/trellis` npm package. See [README_FORK.md](./README_FORK.md) / [README_FORK_CN.md](./README_FORK_CN.md) for changes that are not present in the upstream project at https://github.com/mindfold-ai/Trellis.
+
 <p align="center">
 <strong>Make AI coding reliable at team scale.</strong><br/>
 <sub>A team AI coding harness for progressive specs, custom workflows, task context, and memory across Claude Code, Cursor, Codex, OpenCode, Pi Agent, and more.</sub>
