@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cli/backend/platform-integration.md","reason":"Template/platform guidance must stay synchronized across generated agent files and workflow routing."}
+{"file":".trellis/spec/cli/backend/migrations.md","reason":"Template changes affect trellis update/hash behavior and may need migration awareness."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"CLI TypeScript/test changes must follow project quality rules."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Bug-fix/template behavior changes require appropriate regression or integration assertions."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Changing a repeated template phrase requires searching all instances first."}
+{"file":".trellis/spec/guides/cross-platform-thinking-guide.md","reason":"Generated guidance must stay platform-neutral across supported AI tools."}

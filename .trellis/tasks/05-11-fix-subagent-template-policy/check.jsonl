@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cli/backend/platform-integration.md","reason":"Verify generated platform guidance remains consistent with workflow routing."}
+{"file":".trellis/spec/cli/backend/migrations.md","reason":"Check whether template update implications are handled intentionally."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Verify TypeScript/test edits meet project quality expectations."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Verify the focused tests match project test policy."}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Update integration assertions without over-mocking or brittle setup."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Confirm all old subagent wording instances were found or intentionally left."}

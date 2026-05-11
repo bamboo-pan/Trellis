@@ -67,11 +67,12 @@ function writeHashesV2(hashFile: string, hashes: Record<string, string>): void {
 function removeSubagentsSection(content: string): string {
   return content.replace(
     "\n## Subagents\n\n" +
-      "- ALWAYS wait for all subagents to complete before yielding.\n" +
-      "- Spawn subagents automatically when:\n" +
-      "  - Parallelizable work (e.g., install + verify, npm test + typecheck, multiple tasks from plan)\n" +
-      "  - Long-running or blocking tasks where a worker can run independently.\n" +
-      "  - Isolation for risky changes or checks\n",
+      "This Trellis workflow is main-agent-only.\n" +
+      "\n" +
+      "- Do not spawn or delegate to subagents for Trellis workflow steps.\n" +
+      "- The main agent must perform context loading, research persistence, implementation, verification, spec-update gates, and finish/commit steps directly.\n" +
+      "- If a platform exposes Trellis subagent files, treat them as disabled for this workflow unless the user explicitly changes the policy in the current request.\n" +
+      "- Never use subagents merely because work is parallelizable, long-running, exploratory, or risk-isolated.\n",
     "",
   );
 }

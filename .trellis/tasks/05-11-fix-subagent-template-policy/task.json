@@ -1,0 +1,28 @@
+{
+  "id": "fix-subagent-template-policy",
+  "name": "fix-subagent-template-policy",
+  "title": "Fix subagent template policy drift",
+  "description": "Align generated AGENTS.md subagent guidance with current workflow.md main-session implementation and research policy.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "copilot",
+  "assignee": "copilot",
+  "createdAt": "2026-05-11",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "research_single",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "prd_status": "confirmed"
+  }
+}
