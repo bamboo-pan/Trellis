@@ -1,0 +1,9 @@
+{
+  "version": "0.5.0-single.0",
+  "description": "Publishes a one-off single-track bamboo-pan fork build from the 0.5.0 line. No new migrations.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fork Distribution:**\n- Publish a `single` prerelease build for the bamboo-pan fork package.\n- Keep runtime templates and migration entries aligned with the current 0.5.0 fork branch.\n\n**Migration Notes:**\n- This build adds no migration actions beyond the existing 0.5.0 chain.",
+  "migrations": [],
+  "notes": "One-off install: `npm install -g @bamboo-pan/trellis@single`. Projects on 0.5 beta or rc can run `trellis update`; single.0 adds no migration entries."
+}

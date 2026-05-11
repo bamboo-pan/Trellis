@@ -1,0 +1,9 @@
+{
+  "version": "0.5.0-multi.0",
+  "description": "Publishes the current bamboo-pan fork branch as a multi-track prerelease with the latest workflow guidance, fork publish runbook, and npm metadata. No new migrations.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Workflow Guidance:**\n- Clarify the brainstorm question loop so agents ask one requirement question at a time and keep the PRD in sync before implementation starts.\n- Preserve the hardened PRD confirmation flow from rc.4 so clarification answers do not imply implementation approval.\n\n**Fork Distribution:**\n- Publish the current branch as `0.5.0-multi.0` for the bamboo-pan fork package.\n- Keep the fork npm publish runbook and package README metadata aligned with `@bamboo-pan/trellis`.\n\n**Migration Notes:**\n- This build adds no migration actions beyond the existing 0.5.0 chain.",
+  "migrations": [],
+  "notes": "Default install after promotion: `npm install -g @bamboo-pan/trellis`. Projects on 0.5 beta, rc, single, or earlier multi builds can run `trellis update`; multi.0 adds no migration entries."
+}

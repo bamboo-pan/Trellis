@@ -1,0 +1,9 @@
+{
+  "version": "0.5.0-rc.4",
+  "description": "Patches rc.3 by hardening PRD confirmation guidance so agents continue requirement clarification until the user explicitly approves implementation. No new migrations.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Workflow Guidance:**\n- Harden PRD confirmation guidance so implementation only starts after explicit user confirmation or override.\n- Treat clarification answers as PRD input, not approval, keeping brainstorm and planning flows in question mode until confirmation is clear.\n\n**Fork Distribution:**\n- Continue publishing the bamboo-pan fork package as `@bamboo-pan/trellis` with no migration changes.",
+  "migrations": [],
+  "notes": "Projects on 0.5 beta or earlier rc can run `trellis update`; rc.4 adds no migration entries."
+}
