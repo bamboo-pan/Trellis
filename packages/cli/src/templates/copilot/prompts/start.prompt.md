@@ -134,7 +134,7 @@ See `/` for the full process. Summary:
 
 1. **Acknowledge and classify** - State your understanding
 2. **Create task directory** - Track evolving requirements in `prd.md`
-3. **Ask questions one at a time** - Update PRD after each answer
+3. **Ask questions one at a time** - Continue until all Blocking/Preference questions are resolved; update PRD after each answer
 4. **Propose approaches** - For architectural decisions
 5. **Confirm final requirements** - Get explicit approval
 6. **Proceed to Task Workflow** - With clear requirements in PRD
@@ -147,7 +147,7 @@ See `/` for the full process. Summary:
 
 | Principle | Description |
 |-----------|-------------|
-| **One question at a time** | Never overwhelm with multiple questions |
+| **One question at a time** | Avoid batching; continue until all Blocking/Preference questions are resolved |
 | **Update PRD immediately** | After each answer, update the document |
 | **Prefer multiple choice** | Easier for users to answer |
 | **YAGNI** | Challenge unnecessary complexity |
@@ -244,32 +244,13 @@ Must-have before proceeding:
 
 **Step 5: Research the Codebase** `[AI]`
 
-Based on the confirmed PRD, call Research Agent to find relevant specs and patterns:
+Based on the confirmed PRD, run a focused main-session research pass and produce:
 
-```
-Task(
-  subagent_type: "trellis-research",
-  prompt: "Analyze the codebase for this task:
+1. Relevant code-spec files in `.trellis/spec/`
+2. Existing code patterns to follow (2-3 examples)
+3. Files that will likely need modification
 
-  Task: <goal from PRD>
-  Type: <frontend/backend/fullstack>
-
-  Please find:
-  1. Relevant code-spec files in .trellis/spec/
-  2. Existing code patterns to follow (find 2-3 examples)
-  3. Files that will likely need modification
-
-  Output:
-  ## Relevant Code-Specs
-  - <path>: <why it's relevant>
-
-  ## Code Patterns Found
-  - <pattern>: <example file path>
-
-  ## Files to Modify
-  - <path>: <what change>"
-)
-```
+Persist research-heavy findings to `{TASK_DIR}/research/*.md`.
 
 **Step 6: Configure Context** `[AI]`
 
@@ -277,7 +258,7 @@ Task(
 
 - Put **spec files** (`.trellis/spec/<package>/<layer>/*.md`) and **research files** (`{TASK_DIR}/research/*.md`) only.
 - Do NOT put code files — those are read during implementation, not pre-registered here.
-- Split: `implement.jsonl` = specs the implement sub-agent needs; `check.jsonl` = specs the check sub-agent needs.
+- Split: `implement.jsonl` = specs/research needed for implementation; `check.jsonl` = specs/research needed for verification.
 
 Discover available specs:
 
@@ -306,31 +287,19 @@ This sets the active task through Trellis' session resolver so hooks can inject 
 
 **Step 8: Implement** `[AI]`
 
-Call Implement Agent (code-spec context is auto-injected by hook):
+Implement the task described in `prd.md` in the main session.
 
-```
-Task(
-  subagent_type: "trellis-implement",
-  prompt: "Implement the task described in prd.md.
-
-  Follow all code-spec files that have been injected into your context.
-  Run lint and typecheck before finishing."
-)
-```
+- Load/read the relevant specs from `implement.jsonl`
+- Keep changes scoped to requirements
+- Run lint and typecheck before finishing
 
 **Step 9: Check Quality** `[AI]`
 
-Call Check Agent (code-spec context is auto-injected by hook):
+Run a main-session quality pass against `check.jsonl` context:
 
-```
-Task(
-  subagent_type: "trellis-check",
-  prompt: "Review all code changes against the code-spec requirements.
-
-  Fix any issues you find directly.
-  Ensure lint and typecheck pass."
-)
-```
+- Review all code changes against the specs
+- Fix issues directly
+- Ensure lint and typecheck pass
 
 **Step 10: Complete** `[AI]`
 
@@ -372,20 +341,20 @@ If yes, resume from the appropriate step (usually Step 7 or 8).
 | Script | Purpose |
 |--------|---------|
 | `python3 ./.trellis/scripts/get_context.py` | Get session context |
-| `python3 ./.trellis/scripts/task.py create` | Create task directory (seeds jsonl on sub-agent platforms) |
+| `python3 ./.trellis/scripts/task.py create` | Create task directory (seeds jsonl context files) |
 | `python3 ./.trellis/scripts/task.py add-context` | Append code-spec/research entry to jsonl |
 | `python3 ./.trellis/scripts/task.py start` | Set current task |
 | `python3 ./.trellis/scripts/task.py finish` | Clear current task |
 | `python3 ./.trellis/scripts/task.py archive` | Archive completed task |
 
-### Sub Agents `[AI]`
+### Workflow Phases `[AI]`
 
-| Agent | Purpose | Hook Injection |
+| Phase | Purpose | Context Source |
 |-------|---------|----------------|
-| research | Analyze codebase | No (reads directly) |
-| implement | Write code | Yes (implement.jsonl) |
-| check | Review & fix | Yes (check.jsonl) |
-| debug | Fix specific issues | Yes (debug.jsonl) |
+| research | Analyze codebase | direct repo inspection + `research/*.md` |
+| implement | Write code | `implement.jsonl` |
+| check | Review & fix | `check.jsonl` |
+| debug | Fix specific issues | focused task context |
 
 ---
 

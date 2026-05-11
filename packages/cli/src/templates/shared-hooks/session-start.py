@@ -40,8 +40,8 @@ def _has_curated_jsonl_entry(jsonl_path: Path) -> bool:
 
     A freshly seeded jsonl only contains a ``{"_example": ...}`` row (no
     ``file`` key) — that is NOT "ready". Readiness requires at least one
-    curated entry. Matches the contract used by hook-inject and pull-based
-    sub-agent context loaders.
+    curated entry. Matches the contract used by task readiness checks and
+    context loaders.
     """
     try:
         for line in jsonl_path.read_text(encoding="utf-8").splitlines():
@@ -248,9 +248,8 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             "Next-Action: After the user describes their intent, load skill `trellis-brainstorm` "
             "to clarify requirements and create a task via `python3 ./.trellis/scripts/task.py create`.\n"
             "Research reminder: for research-heavy tasks (comparing tools, reading external docs, "
-            "cross-platform surveys), spawn `trellis-research` sub-agents via the Task tool — "
-            "they persist findings to `{TASK_DIR}/research/*.md` and keep main context clean. "
-            "Do NOT perform inline WebFetch/WebSearch/gh api research in the main conversation.\n"
+            "cross-platform surveys), research in the main session and persist findings to "
+            "`{TASK_DIR}/research/*.md` before linking them from the PRD.\n"
             "User override (per-turn escape hatch): if the user's first message explicitly opts "
             "out of the workflow (\"跳过 trellis\" / \"别走流程\" / \"小修一下\" / \"直接改\" / "
             "\"skip trellis\" / \"no task\" / \"just do it\"), honor it for this turn — "
@@ -299,8 +298,8 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             "Next-Action: Load skill `trellis-brainstorm` to clarify requirements with the user "
             "and produce prd.md in the task directory.\n"
             "Research reminder: when the task needs external research (tool comparison, docs, "
-            "conventions survey), spawn `trellis-research` sub-agents — don't WebFetch/WebSearch/gh api "
-            "inline in the main session. Findings must go to `{TASK_DIR}/research/*.md`; PRD only links to them."
+            "conventions survey), research in the main session and persist findings to "
+            "`{TASK_DIR}/research/*.md`; PRD only links to them."
         )
 
     # Case 4b: PRD exists but implement.jsonl has only seed (no curated entries) — Phase 1.3 gate
@@ -310,8 +309,8 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             f"Status: PLANNING (Phase 1.3)\nTask: {task_title}\n"
             f"Source: {active.source}\n"
             "Next-Action: Curate `implement.jsonl` and `check.jsonl` with the spec + research files "
-            "the Phase 2 sub-agents will need. Only spec paths (`.trellis/spec/**/*.md`) and research "
-            "files written by `trellis-research` (`{TASK_DIR}/research/*.md`) — no code paths. Run "
+            "the main session will need for Phase 2. Only spec paths (`.trellis/spec/**/*.md`) and "
+            "persisted research files (`{TASK_DIR}/research/*.md`) — no code paths. Run "
             "`python3 ./.trellis/scripts/get_context.py --mode packages` to list available specs, "
             "then edit the jsonl files or use `python3 ./.trellis/scripts/task.py add-context`. "
             "See `.trellis/workflow.md` Phase 1.3 for details."
@@ -330,7 +329,7 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             "do NOT run `set-prd-status confirmed` in that same turn unless the same user message "
             "explicitly confirms the whole PRD. "
             "Record the result with `python3 ./.trellis/scripts/task.py set-prd-status <task-dir> confirmed` "
-            "or `... override` before entering implementation. Do NOT dispatch `trellis-implement` yet."
+            "or `... override` before entering implementation. Do NOT start implementation yet."
         )
 
     # Case 4d: PRD is confirmed / overridden, but the task has not crossed the Phase 1.4 start gate yet.
@@ -340,26 +339,20 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             f"Source: {active.source}\n"
             f"Next-Action: run `python3 ./.trellis/scripts/task.py start {task_dir.name}` to enter Phase 2. "
             f"The PRD gate is already satisfied (`prd_status={prd_status}`), so activation is the last "
-            "required step before dispatching `trellis-implement`."
+            "required step before implementation."
         )
 
     # Case 5: task is in_progress and cleared the PRD gate — enter Execute phase
     return (
         f"Status: READY\nTask: {task_title}\n"
         f"Source: {active.source}\n"
-        "Next required action: dispatch `trellis-implement` per Phase 2.1. "
-        "For agent-capable platforms, main-session implementation is blocked: do NOT inspect implementation details, "
-        "edit code, or run implementation inline unless the user's CURRENT message contains an inline override. "
-        "After implementation, dispatch `trellis-check` per Phase 2.2 before reporting completion. "
+        "Next required action: load `trellis-before-dev`, read `prd.md`, curated jsonl entries, "
+        "and any `{TASK_DIR}/research/*.md`, then implement directly in the main session per Phase 2.1. "
+        "After implementation, load/run `trellis-check` in the main session per Phase 2.2 before reporting completion. "
+        "Before repeating any step, inspect existing artifacts/results and skip work that is already complete "
+        "for the current code state. "
         "Before commit/finish, explicitly run/load `trellis-update-spec` for Phase 3.3 and record whether "
-        "spec updates were made; sub-agent spec edits do not replace this explicit judgment.\n"
-        "Sub-agent roster: `trellis-implement` (writes code), `trellis-check` (verifies + self-fixes), "
-        "`trellis-research` (persists findings to `{TASK_DIR}/research/*.md` — use for external/technical "
-        "discovery you'd otherwise do with WebFetch/WebSearch/gh api inline).\n"
-        "User override (per-turn escape hatch): if the user's CURRENT message explicitly tells the "
-        "main session to handle it directly (\"你直接改\" / \"别派 sub-agent\" / \"main session 写就行\" / "
-        "\"do it inline\" / \"不用 sub-agent\"), honor it for this turn and edit code directly. "
-        "Per-turn only; without one of these current-turn phrases, main-session implementation remains blocked."
+        "spec updates were made; spec edits made during implementation/check do not replace this explicit judgment."
     )
 
 
@@ -675,14 +668,10 @@ Read and follow all instructions below carefully.
         "Project spec indexes are listed by path below. Each index contains a "
         "**Pre-Development Checklist** listing the specific guideline files to "
         "read before coding.\n\n"
-        "- If you're spawning an implement/check sub-agent, context is injected "
-        "or loaded by the sub-agent via `{task}/implement.jsonl` / `check.jsonl`. "
-        "You do NOT need to read these indexes yourself.\n"
-        "- For agent-capable platforms, the default is to dispatch "
-        "`trellis-implement` and `trellis-check` (so JSONL context is loaded by "
-        "the sub-agents) rather than editing code in the main session. "
-        "Honor a per-turn user override only if the user's current message "
-        "explicitly opts out (see <task-status> below for override phrases).\n\n"
+        "- The main session is responsible for reading relevant spec indexes and "
+        "curated `{task}/implement.jsonl` / `check.jsonl` entries before coding/checking.\n"
+        "- Load `trellis-before-dev` before implementation and `trellis-check` before completion. "
+        "Do not repeat already completed `[once]` steps; continue from the next unfinished step.\n\n"
     )
 
     # guides/ is cross-package thinking — always include inline (small, broadly useful)
@@ -692,8 +681,8 @@ Read and follow all instructions below carefully.
         output.write(read_file(guides_index))
         output.write("\n\n")
 
-    # Other spec indexes — paths only (main agent reads on demand;
-    # sub-agents get their specific specs via jsonl injection)
+    # Other spec indexes — paths only (main agent reads on demand and via
+    # curated jsonl entries)
     paths: list[str] = []
     spec_dir = trellis_dir / "spec"
     if spec_dir.is_dir():

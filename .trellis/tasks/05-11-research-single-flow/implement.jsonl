@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cli/backend/workflow-state-contract.md","reason":"Workflow breadcrumb and session-start contract for changing phase guidance."}
+{"file":".trellis/spec/cli/backend/platform-integration.md","reason":"Platform template and hook synchronization rules."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"TypeScript and CLI code quality requirements."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Regression test update requirements."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Flow spans workflow docs, hooks, and generated platform surfaces."}
+{"file":".trellis/tasks/05-11-research-single-flow/research/flow-touchpoints.md","reason":"Local research summary of source and test touchpoints for this flow change."}

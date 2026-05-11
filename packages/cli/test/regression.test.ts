@@ -2746,7 +2746,7 @@ describe("regression: current-task path normalization", () => {
     );
   });
 
-  it("[workflow-v2] shared session-start READY guidance requires implement/check sub-agents", () => {
+  it("[workflow-v2] shared session-start READY guidance uses main-session implement/check", () => {
     setupTaskRepo();
     writeSessionContext("claude_session-a", ".trellis/tasks/issue-106");
 
@@ -2759,23 +2759,19 @@ describe("regression: current-task path normalization", () => {
       path.join(".claude", "hooks", "session-start.py"),
       JSON.stringify({ cwd: tmpDir, session_id: "session-a" }),
     );
-    expect(rawOutput).toContain(
-      "Next required action: dispatch `trellis-implement`",
-    );
-    expect(rawOutput).toContain("main-session implementation is blocked");
-    expect(rawOutput).toContain("do NOT inspect implementation details");
-    expect(rawOutput).toContain("unless the user's CURRENT message");
-    expect(rawOutput).toContain("dispatch `trellis-check`");
+    expect(rawOutput).toContain("Next required action: load `trellis-before-dev`");
+    expect(rawOutput).toContain("implement directly in the main session");
+    expect(rawOutput).toContain("load/run `trellis-check` in the main session");
+    expect(rawOutput).toContain("skip work that is already complete");
     expect(rawOutput).toContain(
       "Before commit/finish, explicitly run/load `trellis-update-spec` for Phase 3.3",
     );
     expect(rawOutput).toContain(
-      "sub-agent spec edits do not replace this explicit judgment",
+      "spec edits made during implementation/check do not replace this explicit judgment",
     );
-    expect(rawOutput).not.toContain("if you stay in the main session");
-    expect(rawOutput).not.toContain(
-      "load `trellis-before-dev` before writing code",
-    );
+    expect(rawOutput).not.toContain("dispatch `trellis-implement`");
+    expect(rawOutput).not.toContain("main-session implementation is blocked");
+    expect(rawOutput).not.toContain("do NOT inspect implementation details");
     expect(rawOutput).not.toContain("If there is an active task, ask whether");
     expect(rawOutput).toContain(
       "execute its Next required action without asking whether to continue",
@@ -2867,10 +2863,15 @@ describe("regression: current-task path normalization", () => {
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
       "Refer to workflow.md",
     );
-    // Hardcoded fallback wording must NOT appear post-R5
-    expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
+    // Hardcoded fallback wording must NOT appear post-R5.
+    for (const fallbackPhrase of [
       "trellis-implement → trellis-check",
-    );
+      "main-session implement → main-session check",
+    ]) {
+      expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
+        fallbackPhrase,
+      );
+    }
   });
 
   it("[workflow-state] in_progress tag in workflow.md mentions Phase 3.4 commit (R1 invariant)", () => {
@@ -2882,7 +2883,7 @@ describe("regression: current-task path normalization", () => {
     // regressions that omit Phase 3.4 from the per-turn breadcrumb.
     writeWorkflowMd(
       "[workflow-state:in_progress]\n" +
-        "Flow: trellis-implement → trellis-check → trellis-update-spec → commit (Phase 3.4) → /trellis:finish-work\n" +
+        "Flow: main-session implement → main-session check → trellis-update-spec → commit (Phase 3.4) → /trellis:finish-work\n" +
         "[/workflow-state:in_progress]\n",
     );
 
@@ -2908,9 +2909,14 @@ describe("regression: current-task path normalization", () => {
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
       "CUSTOM BODY from workflow.md",
     );
-    expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
+    for (const fallbackPhrase of [
       "trellis-implement → trellis-check",
-    );
+      "main-session implement → main-session check",
+    ]) {
+      expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
+        fallbackPhrase,
+      );
+    }
   });
 
   it("[workflow-state-r5] inject-workflow-state.py contains no _FALLBACK_BREADCRUMBS dict (post-rc.0 collapse)", () => {
@@ -3089,9 +3095,10 @@ describe("regression: current-task path normalization", () => {
   // v0.5.0-beta.12: init-context removal + jsonl seeding on task create
   // ------------------------------------------------------------
 
-  it("[init-context-removal] task.py create does NOT seed jsonl when no sub-agent platform configured", () => {
+  it("[init-context-removal] task.py create seeds jsonl without platform config", () => {
     setupTaskRepo();
-    // setupTaskRepo does not create any .{platform}/ dir → agent-less mode
+    // setupTaskRepo does not create any .{platform}/ dir; JSONL still seeds
+    // because Phase 1.3 is now main-session context curation for all flows.
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     execSync(
       `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "plain task" --slug plain-task --assignee test-dev`,
@@ -3103,11 +3110,11 @@ describe("regression: current-task path normalization", () => {
       .filter((d) => d.includes("plain-task"));
     expect(newDirs.length).toBeGreaterThan(0);
     const taskDir = path.join(tasksDir, newDirs[0]);
-    expect(fs.existsSync(path.join(taskDir, "implement.jsonl"))).toBe(false);
-    expect(fs.existsSync(path.join(taskDir, "check.jsonl"))).toBe(false);
+    expect(fs.existsSync(path.join(taskDir, "implement.jsonl"))).toBe(true);
+    expect(fs.existsSync(path.join(taskDir, "check.jsonl"))).toBe(true);
   });
 
-  it("[init-context-removal] task.py create seeds jsonl when a sub-agent platform dir exists", () => {
+  it("[init-context-removal] task.py create seeds jsonl when a platform dir exists", () => {
     setupTaskRepo();
     // Simulate a Claude Code install
     fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
@@ -3284,21 +3291,33 @@ print(len(entries))
     expect(body).toMatch(/commit \(Phase 3\.4\)/i);
   });
 
-  it("[workflow-main-session-gate] template workflow.md in_progress blocks inline main-session implementation", () => {
+  it("[workflow-main-session-gate] template workflow.md in_progress routes through main-session implementation", () => {
     const wf = templateWorkflowMd();
     const match = wf.match(
       /\[workflow-state:in_progress\]([\s\S]*?)\[\/workflow-state:in_progress\]/,
     );
     expect(match).toBeTruthy();
     const body = match?.[1] ?? "";
-    expect(body).toContain(
-      "Next required action: dispatch `trellis-implement` per Phase 2.1",
+    expect(body).toContain("Next required action");
+    expect(body).toContain("load `trellis-before-dev`");
+    expect(body).toContain("implement directly in the main session");
+    expect(body).toContain("No-repeat rule");
+    expect(body).not.toContain("dispatch `trellis-implement`");
+    expect(body).not.toContain("main-session implementation is blocked");
+  });
+
+  it("[agents-main-session-gate] template AGENTS.md does not auto-spawn subagents", () => {
+    const content = markdownExports.agentsMdContent;
+    expect(content).toContain("This Trellis workflow is main-agent-only.");
+    expect(content).toContain(
+      "Do not spawn or delegate to subagents for Trellis workflow steps.",
     );
-    expect(body).toContain("main-session implementation is blocked");
-    expect(body).toContain("must NOT inspect implementation details");
-    expect(body).toContain("the user's CURRENT message MUST explicitly contain");
-    expect(body).toContain(
-      "Without seeing one of these phrases you must NOT inline",
+    expect(content).toContain("The main agent must perform context loading");
+    expect(content).not.toContain("Spawn subagents automatically");
+    expect(content).not.toContain("optional helpers");
+    expect(content).not.toContain("Use subagents only");
+    expect(content).not.toContain(
+      "Parallelizable work (e.g., install + verify, npm test + typecheck, multiple tasks from plan)",
     );
   });
 
@@ -3315,7 +3334,7 @@ print(len(entries))
     );
     expect(body).toContain("record whether spec updates were made");
     expect(body).toContain(
-      "Spec edits made opportunistically by `trellis-implement` / `trellis-check` do NOT replace",
+      "Spec edits made during implementation/check do NOT replace",
     );
   });
 
@@ -3330,7 +3349,7 @@ print(len(entries))
     expect(body).toMatch(/implement\.jsonl|check\.jsonl/);
   });
 
-  it("[workflow-main-session-gate] template workflow.md planning block requires trellis-research persistence", () => {
+  it("[workflow-main-session-gate] template workflow.md planning block requires main-session research persistence", () => {
     const wf = templateWorkflowMd();
     const match = wf.match(
       /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/,
@@ -3340,19 +3359,15 @@ print(len(entries))
     expect(body).toContain(
       "Research output **must** land in `{TASK_DIR}/research/*.md`",
     );
-    expect(body).toContain("written by `trellis-research` sub-agents");
-    expect(body).toContain(
-      "must NOT do inline WebFetch / WebSearch / `gh api` discovery",
-    );
+    expect(body).toContain("written by the main session");
+    expect(body).not.toContain("written by `trellis-research` sub-agents");
   });
 
   it("[workflow-main-session-gate] template workflow.md routes Phase 3.1 verification through trellis-check", () => {
     const wf = templateWorkflowMd();
     expect(wf).toContain("#### 3.1 Quality verification");
-    expect(wf).toContain("Dispatch `trellis-check` before commit closure");
-    expect(wf).toContain(
-      "The main session does not inspect or patch implementation details inline",
-    );
+    expect(wf).toContain("Load the `trellis-check` skill and do a final verification");
+    expect(wf).not.toContain("Dispatch `trellis-check` before commit closure");
   });
 
   it("[workflow-main-session-gate] template workflow.md routes Phase 3.3 through explicit trellis-update-spec judgment", () => {
@@ -3370,14 +3385,14 @@ print(len(entries))
       "explicitly load/run/walk through `trellis-update-spec`",
     );
     expect(specUpdate).toContain(
-      "Spec edits made opportunistically by `trellis-implement` / `trellis-check` do NOT replace",
+      "Spec edits made during implementation/check do NOT replace",
     );
     expect(specUpdate).toContain(
       "the main session still walks through `trellis-update-spec`",
     );
   });
 
-  it("[workflow-main-session-gate] template workflow.md Phase 2 routes sub-agent-capable platforms through implement/check agents", () => {
+  it("[workflow-main-session-gate] template workflow.md Phase 2 routes through main-session skills", () => {
     const wf = templateWorkflowMd();
     const implement = workflowSection(
       wf,
@@ -3390,30 +3405,15 @@ print(len(entries))
       "#### 2.3 Rollback `[on demand]`",
     );
 
-    expect(implement).toContain("Main-session no-inline gate");
-    expect(implement).toContain(
-      "Dispatch the implementation work to the sub-agent",
-    );
-    expect(implement).toContain("**Agent type**: `trellis-implement`");
-    expect(check).toContain("Main-session no-inline gate");
-    expect(check).toContain("Dispatch verification to the check sub-agent");
-    expect(check).toContain("**Agent type**: `trellis-check`");
-
-    const directImplement =
-      implement.match(
-        /\[Kilo, Antigravity, Windsurf\]([\s\S]*?)\[\/Kilo, Antigravity, Windsurf\]/,
-      )?.[1] ?? "";
-    const directCheck =
-      check.match(
-        /\[Kilo, Antigravity, Windsurf\]([\s\S]*?)\[\/Kilo, Antigravity, Windsurf\]/,
-      )?.[1] ?? "";
-    expect(directImplement).toContain("Load the `trellis-before-dev` skill");
-    expect(directImplement).not.toContain("Main-session no-inline gate");
-    expect(directCheck).toContain("Load the `trellis-check` skill");
-    expect(directCheck).not.toContain("Main-session no-inline gate");
+    expect(implement).toContain("Load the `trellis-before-dev` skill");
+    expect(implement).toContain("Read curated entries from `{TASK_DIR}/implement.jsonl`");
+    expect(implement).not.toContain("Main-session no-inline gate");
+    expect(implement).not.toContain("trellis-implement` sub-agent");
+    expect(check).toContain("Load the `trellis-check` skill");
+    expect(check).not.toContain("Dispatch verification to the check sub-agent");
   });
 
-  it("[workflow-main-session-gate] generated session summaries keep no-inline and research persistence guards", () => {
+  it("[workflow-main-session-gate] generated session summaries keep main-session and research persistence guards", () => {
     const claudeTemplates = collectPlatformTemplates("claude-code");
     const codexTemplates = collectPlatformTemplates("codex");
     const copilotTemplates = collectPlatformTemplates("copilot");
@@ -3438,24 +3438,19 @@ print(len(entries))
     ] as const) {
       expect(content, `${label} session summary should exist`).toBeTruthy();
       const surface = content ?? "";
-      expect(surface).toContain(
-        "Next required action: dispatch `trellis-implement`",
-      );
-      expect(surface).toContain("main-session implementation is blocked");
-      expect(surface).toContain("do NOT inspect implementation details");
-      expect(surface).toContain(
-        "unless the user's CURRENT message contains an inline override",
-      );
-      expect(surface).toContain("dispatch `trellis-check` per Phase 2.2");
+      expect(surface).toContain("Next required action: load `trellis-before-dev`");
+      expect(surface).toContain("implement directly in the main session");
+      expect(surface).toContain("load/run `trellis-check` in the main session");
+      expect(surface).toContain("skip work that is already complete");
       expect(surface).toContain(
         "Before commit/finish, explicitly run/load `trellis-update-spec` for Phase 3.3",
       );
       expect(surface).toContain(
-        "sub-agent spec edits do not replace this explicit judgment",
+        "spec edits made during implementation/check do not replace this explicit judgment",
       );
-      expect(surface).toContain("`trellis-research`");
       expect(surface).toContain("`{TASK_DIR}/research/*.md`");
-      expect(surface).toContain("WebFetch/WebSearch/gh api");
+      expect(surface).not.toContain("dispatch `trellis-implement`");
+      expect(surface).not.toContain("main-session implementation is blocked");
       expect(surface).toContain("whole-PRD confirmation summary");
       expect(surface).toContain(
         "final clarification/product preference question is not PRD confirmation",
@@ -3466,24 +3461,17 @@ print(len(entries))
     }
   });
 
-  it("[workflow-main-session-gate] brainstorm research guidance delegates discovery to trellis-research", () => {
+  it("[workflow-main-session-gate] brainstorm research guidance persists main-session research", () => {
     const brainstorm = getSkillTemplates().find(
       (template) => template.name === "brainstorm",
     )?.content;
     expect(brainstorm).toBeTruthy();
     const content = brainstorm ?? "";
+    expect(content).toContain("Research in the main session and persist findings");
     expect(content).toContain(
-      "Delegate external/technical discovery to `trellis-research` sub-agents",
+      "write the durable result to `{TASK_DIR}/research/<topic-slug>.md`",
     );
-    expect(content).toContain(
-      "spawn a `trellis-research` sub-agent via the Task tool",
-    );
-    expect(content).toContain(
-      "don't do WebFetch / WebSearch / `gh api` inline in the main conversation",
-    );
-    expect(content).toContain(
-      "persist findings to `{TASK_DIR}/research/<topic-slug>.md`",
-    );
+    expect(content).not.toContain("spawn a `trellis-research` sub-agent");
   });
 
   it("[prd-confirmation-guard] brainstorm guidance rejects sub-question answers as PRD confirmation", () => {
@@ -3575,9 +3563,10 @@ print(len(entries))
       "spec = importlib.util.spec_from_file_location('ss', pathlib.Path('.claude/hooks/session-start.py'))",
       "mod = importlib.util.module_from_spec(spec)",
       "spec.loader.exec_module(mod)",
-      "matched = '[workflow-state:planning]\\nbody\\n[/workflow-state:planning]'",
-      "mismatched = '[workflow-state:planning]\\nbody\\n[/workflow-state:in_progress]'",
-      "nested_orphan = '[workflow-state:planning]\\nbody1\\n[/workflow-state:other]\\ntail\\n[/workflow-state:planning]'",
+      "nl = chr(10)",
+      "matched = nl.join(['[workflow-state:planning]', 'body', '[/workflow-state:planning]'])",
+      "mismatched = nl.join(['[workflow-state:planning]', 'body', '[/workflow-state:in_progress]'])",
+      "nested_orphan = nl.join(['[workflow-state:planning]', 'body1', '[/workflow-state:other]', 'tail', '[/workflow-state:planning]'])",
       "result = {'M': mod._strip_breadcrumb_tag_blocks(matched), 'X': mod._strip_breadcrumb_tag_blocks(mismatched), 'N': mod._strip_breadcrumb_tag_blocks(nested_orphan)}",
       "print(json.dumps(result))",
     ].join("; ");
@@ -3633,11 +3622,11 @@ print(len(entries))
     expect(output).toContain("#### 2.1 Implement");
     expect(output).toContain("## Phase 3: Finish");
     expect(output).toContain("#### 3.3 Spec update");
-    // Stops at Workflow State Breadcrumbs (consumed by UserPromptSubmit hook)
+    // Stops before Customizing Trellis; workflow-state breadcrumbs are stripped.
     expect(output).not.toContain("## Workflow State Breadcrumbs");
   });
 
-  it("[workflow-v2] --mode phase --platform codex filters out generic before-dev routing", () => {
+  it("[workflow-v2] --mode phase --platform codex uses main-session before-dev routing", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -3656,14 +3645,13 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("trellis-implement");
-    expect(output).not.toContain(
-      "| About to write code / start implementing | trellis-before-dev |",
-    );
-    expect(output).not.toContain("before-dev takes under a minute");
+    expect(output).toContain("`trellis-before-dev`");
+    expect(output).toContain("implement directly in the main session");
+    expect(output).toContain("implement.jsonl");
+    expect(output).not.toContain("Dispatch the `trellis-implement` sub-agent");
   });
 
-  it("[pi] --mode phase --platform pi uses sub-agent routing", () => {
+  it("[pi] --mode phase --platform pi uses main-session routing", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -3682,15 +3670,13 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("trellis-implement");
+    expect(output).toContain("`trellis-before-dev`");
+    expect(output).toContain("implement directly in the main session");
     expect(output).toContain("implement.jsonl");
-    expect(output).not.toContain(
-      "| About to write code / start implementing | trellis-before-dev |",
-    );
-    expect(output).not.toContain("before-dev takes under a minute");
+    expect(output).not.toContain("Dispatch the `trellis-implement` sub-agent");
   });
 
-  it("[workflow-v2] step 2.1 for codex describes self-loaded agent context, not hook injection", () => {
+  it("[workflow-v2] step 2.1 for codex describes main-session context loading", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -3709,19 +3695,15 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("The Codex sub-agent definition auto-handles");
-    expect(output).toContain("Task: `{TASK_DIR}`");
-    expect(output).toContain(
-      "Resolves the active task with `task.py current --source`",
-    );
-    expect(output).toContain(
-      "falls back to the explicit `Task: {TASK_DIR}` path",
-    );
+    expect(output).toContain("Load the `trellis-before-dev` skill");
+    expect(output).toContain("Read `{TASK_DIR}/prd.md` for requirements");
+    expect(output).toContain("Read curated entries from `{TASK_DIR}/implement.jsonl`");
+    expect(output).toContain("Implement the code per requirements");
+    expect(output).not.toContain("The Codex sub-agent definition auto-handles");
     expect(output).not.toContain("The platform hook/plugin auto-handles");
-    expect(output).not.toContain("Load the `trellis-before-dev` skill");
   });
 
-  it("[workflow-v2] step 2.2 for codex includes explicit task path fallback", () => {
+  it("[workflow-v2] step 2.2 for codex uses main-session trellis-check", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -3740,18 +3722,13 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain(
-      "The Codex check agent uses the same pull-based context load requirement",
-    );
-    expect(output).toContain("Task: `{TASK_DIR}`");
-    expect(output).toContain(
-      "falls back to the explicit `Task: {TASK_DIR}` path",
-    );
+    expect(output).toContain("Load the `trellis-check` skill");
+    expect(output).toContain("Spec compliance");
     expect(output).not.toContain("The platform hook/plugin auto-handles");
-    expect(output).not.toContain("Load the `trellis-check` skill");
+    expect(output).not.toContain("The Codex check agent uses the same pull-based context load requirement");
   });
 
-  it("[pi] step 2.1 describes extension-backed sub-agent context path", () => {
+  it("[pi] step 2.1 describes main-session context path", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -3770,15 +3747,13 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("The platform hook/plugin auto-handles");
-    expect(output).toContain("Reads `implement.jsonl`");
+    expect(output).toContain("Load the `trellis-before-dev` skill");
+    expect(output).toContain("Read curated entries from `{TASK_DIR}/implement.jsonl`");
+    expect(output).not.toContain("The platform hook/plugin auto-handles");
     expect(output).not.toContain("The Codex sub-agent definition auto-handles");
-    expect(output).not.toContain("Load the `trellis-before-dev` skill");
   });
 
-  it("[workflow-v2] --mode phase --platform kilo keeps trellis-before-dev routing (agent-less path)", () => {
-    // Symmetric to the codex filter test: agent-less platforms MUST still
-    // see `trellis-before-dev` because they write code in the main session.
+  it("[workflow-v2] --mode phase --platform kilo keeps trellis-before-dev routing", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -4297,21 +4272,17 @@ describe("regression: cli_adapter platform support (beta.9, beta.13, beta.16)", 
     expect(taskContext as string).toMatch(/def cmd_list_context\b/);
   });
 
-  it("[init-context-removal] task_store.cmd_create seeds jsonl for sub-agent platforms", () => {
+  it("[init-context-removal] task_store.cmd_create seeds jsonl for every task", () => {
     const taskStore = getAllScripts().get("common/task_store.py");
     expect(taskStore).toBeDefined();
-    // Sub-agent platform probe.
-    expect(taskStore as string).toMatch(/_SUBAGENT_CONFIG_DIRS/);
-    expect(taskStore as string).toContain('".claude"');
-    expect(taskStore as string).toContain('".codex"');
-    expect(taskStore as string).toContain('".github/copilot"');
-    expect(taskStore as string).toContain('".pi"');
+    expect(taskStore as string).not.toMatch(/_SUBAGENT_CONFIG_DIRS/);
+    expect(taskStore as string).not.toMatch(/_has_subagent_platform/);
     // Seed row is self-describing and has no `file` field (so consumers skip
     // it naturally).
     expect(taskStore as string).toMatch(/_write_seed_jsonl/);
     expect(taskStore as string).toContain('"_example"');
-    // cmd_create calls into the seed path.
-    expect(taskStore as string).toMatch(/_has_subagent_platform\(repo_root\)/);
+    // cmd_create always iterates both context manifests.
+    expect(taskStore as string).toContain('for jsonl_name in ("implement.jsonl", "check.jsonl")');
   });
 
   // Regression for 04-22-migrate-flow-bugs Bug C: breaking releases must

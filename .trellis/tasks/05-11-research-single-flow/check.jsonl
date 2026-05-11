@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cli/backend/workflow-state-contract.md","reason":"Verify breadcrumb required-step coverage remains synchronized."}
+{"file":".trellis/spec/cli/backend/platform-integration.md","reason":"Verify platform-generated surfaces stay consistent."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Verify CLI source style and TypeScript quality expectations."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Verify tests follow project conventions."}
+{"file":".trellis/tasks/05-11-research-single-flow/research/flow-touchpoints.md","reason":"Verify all identified surfaces were updated consistently."}

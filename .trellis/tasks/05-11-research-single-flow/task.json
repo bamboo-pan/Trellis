@@ -1,0 +1,28 @@
+{
+  "id": "research-single-flow",
+  "name": "research-single-flow",
+  "title": "Main-session Trellis flow",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "copilot",
+  "assignee": "copilot",
+  "createdAt": "2026-05-11",
+  "completedAt": null,
+  "branch": "research_single",
+  "base_branch": "research_single",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "prd_status": "confirmed"
+  }
+}

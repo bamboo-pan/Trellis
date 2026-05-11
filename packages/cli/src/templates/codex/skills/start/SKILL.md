@@ -124,7 +124,7 @@ See `$brainstorm` for the full process. Summary:
 
 1. **Acknowledge and classify** - State your understanding
 2. **Create task directory** - Track evolving requirements in `prd.md`
-3. **Ask questions one at a time** - Update PRD after each answer
+3. **Ask questions one at a time** - Continue until all Blocking/Preference questions are resolved; update PRD after each answer
 4. **Propose approaches** - For architectural decisions
 5. **Confirm final requirements** - Get explicit approval
 6. **Proceed to Task Workflow** - With clear requirements in PRD
@@ -248,7 +248,7 @@ Use this output format:
 
 - Put **spec files** (`.trellis/spec/<package>/<layer>/*.md`) and **research files** (`{TASK_DIR}/research/*.md`) only.
 - Do NOT put code files (`src/**`, `packages/**`) — those are read during implementation, not pre-registered here.
-- Split: `implement.jsonl` = specs the implement sub-agent needs; `check.jsonl` = specs the check sub-agent needs.
+- Split: `implement.jsonl` = specs/research needed for implementation; `check.jsonl` = specs/research needed for verification.
 
 Discover available specs:
 
@@ -329,7 +329,7 @@ If yes, resume from the appropriate step (usually Step 7 or 8).
 | Script | Purpose |
 |--------|---------|
 | `python3 ./.trellis/scripts/get_context.py` | Get session context |
-| `python3 ./.trellis/scripts/task.py create` | Create task directory (seeds jsonl on sub-agent platforms) |
+| `python3 ./.trellis/scripts/task.py create` | Create task directory (seeds jsonl context files) |
 | `python3 ./.trellis/scripts/task.py add-context` | Append spec/research entry to jsonl |
 | `python3 ./.trellis/scripts/task.py start` | Set current task |
 | `python3 ./.trellis/scripts/task.py finish` | Clear current task |
