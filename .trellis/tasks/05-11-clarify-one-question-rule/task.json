@@ -1,0 +1,28 @@
+{
+  "id": "clarify-one-question-rule",
+  "name": "clarify-one-question-rule",
+  "title": "Clarify one-question brainstorm rule",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "kleinhe",
+  "assignee": "kleinhe",
+  "createdAt": "2026-05-11",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "research_single",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Spec update gate: no code-spec update needed; this was a text-only clarification of existing brainstorm behavior.",
+  "meta": {
+    "prd_status": "confirmed"
+  }
+}

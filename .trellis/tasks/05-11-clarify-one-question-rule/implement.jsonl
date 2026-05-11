@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cli/backend/index.md", "reason": "Template/workflow wording change follows CLI backend template conventions"}
+{"file": ".trellis/spec/cli/backend/platform-integration.md", "reason": "Common templates are the source for platform skill and prompt behavior"}
