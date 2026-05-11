@@ -124,7 +124,7 @@ See `$brainstorm` for the full process. Summary:
 
 1. **Acknowledge and classify** - State your understanding
 2. **Create task directory** - Track evolving requirements in `prd.md`
-3. **Ask questions one at a time** - Update PRD after each answer
+3. **Ask questions one at a time** - Continue until all Blocking/Preference questions are resolved; update PRD after each answer
 4. **Propose approaches** - For architectural decisions
 5. **Confirm final requirements** - Get explicit approval
 6. **Proceed to Task Workflow** - With clear requirements in PRD

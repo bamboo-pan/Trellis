@@ -309,7 +309,7 @@ Skip when `python3 ./.trellis/scripts/task.py current --source` already points t
 Load the `trellis-brainstorm` skill and explore requirements interactively with the user per the skill's guidance.
 
 The brainstorm skill will guide you to:
-- Ask one question at a time
+- Ask one question at a time; continue until all Blocking/Preference questions are resolved
 - Prefer researching over asking the user
 - Prefer offering options over open-ended questions
 - Update `prd.md` immediately after each user answer

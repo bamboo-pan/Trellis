@@ -30,6 +30,7 @@ Triggered from {{CMD_REF:start}} when the user describes a development task, esp
 
 3. **One question per message**
    Never overwhelm the user with a list of questions. Ask one, update PRD, repeat.
+   This limits batching, not the total number of questions; continue until all Blocking/Preference questions are resolved.
 
 4. **Prefer concrete options**
    For preference/decision questions, present 2–3 feasible, specific approaches with trade-offs.
@@ -330,6 +331,7 @@ Then update PRD:
 ### Rules
 
 * One question per message
+* Continue until all Blocking/Preference questions are resolved
 * Prefer multiple-choice when possible
 * After each user answer:
 

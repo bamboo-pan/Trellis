@@ -134,7 +134,7 @@ See `/` for the full process. Summary:
 
 1. **Acknowledge and classify** - State your understanding
 2. **Create task directory** - Track evolving requirements in `prd.md`
-3. **Ask questions one at a time** - Update PRD after each answer
+3. **Ask questions one at a time** - Continue until all Blocking/Preference questions are resolved; update PRD after each answer
 4. **Propose approaches** - For architectural decisions
 5. **Confirm final requirements** - Get explicit approval
 6. **Proceed to Task Workflow** - With clear requirements in PRD
@@ -147,7 +147,7 @@ See `/` for the full process. Summary:
 
 | Principle | Description |
 |-----------|-------------|
-| **One question at a time** | Never overwhelm with multiple questions |
+| **One question at a time** | Avoid batching; continue until all Blocking/Preference questions are resolved |
 | **Update PRD immediately** | After each answer, update the document |
 | **Prefer multiple choice** | Easier for users to answer |
 | **YAGNI** | Challenge unnecessary complexity |
