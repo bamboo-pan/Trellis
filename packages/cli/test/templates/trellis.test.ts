@@ -86,45 +86,29 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain("#");
   });
 
-  it("[issue-225] workflow.md in_progress breadcrumb has class-2 sub-agent dispatch protocol", () => {
-    // The in_progress breadcrumb instructs the main agent to prefix
-    // dispatch prompts with "Active task: <path>" on class-2 platforms.
-    // Without this line, codex/copilot/gemini/qoder sub-agents cannot
-    // find the active task (no PreToolUse hook to inject context).
+  it("[single-flow] workflow.md in_progress breadcrumb routes implementation through the main session", () => {
     const block = inProgressBreadcrumb();
-    expect(block).toContain("Active task:");
-    expect(block.toLowerCase()).toContain("class-2");
-    expect(block).toMatch(/codex|copilot|gemini|qoder/);
+    expect(block).toContain("main-session implement");
+    expect(block).toContain("load `trellis-before-dev`");
+    expect(block).toContain("implement directly in the main session");
+    expect(block).toContain("load/run `trellis-check` in the main session");
+    expect(block).not.toContain("Active task:");
   });
 
-  it("[issue-237] workflow.md in_progress breadcrumb self-exempts implement/check sub-agents", () => {
-    // The in_progress breadcrumb may be injected into sub-agent turns on some
-    // hosts, so its main-session dispatch guidance must not recursively apply
-    // to a sub-agent that is already doing the requested work.
+  it("[single-flow] workflow.md in_progress breadcrumb requires spec-update and commit gates", () => {
     const block = inProgressBreadcrumb();
-    expect(block).toContain("Main-session default");
-    expect(block).toContain("Sub-agent self-exemption");
-    expect(block).toContain("already running as `trellis-implement`");
-    expect(block).toContain("do NOT spawn another `trellis-implement`");
-    expect(block).toContain("already running as `trellis-check`");
-    expect(block).toContain("do NOT spawn another `trellis-check`");
-    expect(block).toContain("main session only");
+    expect(block).toContain("Phase 3.3 spec update gate");
+    expect(block).toContain("drive Phase 3.4 commit");
+    expect(block).toContain("BEFORE suggesting `/trellis:finish-work`");
+    expect(block).not.toContain("Sub-agent self-exemption");
   });
 
-  it("[issue-237] workflow.md Phase 2 dispatch steps require prompt recursion guards", () => {
-    expect(workflowMdTemplate).toContain("**Dispatch prompt guard**");
-    expect(workflowMdTemplate).toContain(
-      "already the `trellis-implement` sub-agent",
-    );
-    expect(workflowMdTemplate).toContain(
-      "not spawn another `trellis-implement` / `trellis-check`",
-    );
-    expect(workflowMdTemplate).toContain(
-      "already the `trellis-check` sub-agent",
-    );
-    expect(workflowMdTemplate).toContain(
-      "not spawn another `trellis-check` / `trellis-implement`",
-    );
+  it("[single-flow] workflow.md Phase 2 steps load context in the main session", () => {
+    expect(workflowMdTemplate).toContain("Load the `trellis-before-dev` skill");
+    expect(workflowMdTemplate).toContain("Read `{TASK_DIR}/prd.md`");
+    expect(workflowMdTemplate).toContain("Consult materials under `{TASK_DIR}/research/`");
+    expect(workflowMdTemplate).toContain("Load the `trellis-check` skill");
+    expect(workflowMdTemplate).not.toContain("**Dispatch prompt guard**");
   });
 
   it("gitignoreTemplate contains ignore patterns", () => {

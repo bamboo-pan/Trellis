@@ -1,13 +1,13 @@
 {
-  "name": "@mindfoldhq/trellis",
-  "version": "0.5.16",
-  "description": "AI capabilities grow like ivy — Trellis provides the structure to guide them along a disciplined path",
+  "name": "@bamboo-pan/trellis",
+  "version": "0.5.16-single.0",
+  "description": "bamboo-pan fork of Trellis, an AI coding harness for progressive specs, workflows, task context, and memory",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "trellis": "./bin/trellis.js",
-    "tl": "./bin/trellis.js"
+    "trellis": "bin/trellis.js",
+    "tl": "bin/trellis.js"
   },
   "publishConfig": {
     "access": "public"
@@ -28,10 +28,10 @@
     "typecheck": "tsc --noEmit",
     "lint:py": "basedpyright",
     "lint:all": "pnpm lint && pnpm lint:py",
-    "prepublishOnly": "pnpm test && pnpm run build && cp ../../README.md ../../LICENSE .",
-    "release": "node scripts/check-manifest-continuity.js && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version patch && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin main --tags",
-    "release:minor": "node scripts/check-manifest-continuity.js && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version minor && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin main --tags",
-    "release:major": "node scripts/check-manifest-continuity.js && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version major && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin main --tags",
+    "prepublishOnly": "pnpm test && pnpm run build && node -e \"const fs=require('node:fs'); fs.copyFileSync('../../README_FORK.md','README.md'); fs.copyFileSync('../../README_FORK_CN.md','README_CN.md'); fs.copyFileSync('../../LICENSE','LICENSE');\"",
+    "release": "node scripts/check-manifest-continuity.js && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version patch && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin HEAD --tags",
+    "release:minor": "node scripts/check-manifest-continuity.js && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version minor && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin HEAD --tags",
+    "release:major": "node scripts/check-manifest-continuity.js && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version major && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin HEAD --tags",
     "release:beta": "node scripts/check-manifest-continuity.js && node scripts/check-docs-changelog.js --type beta && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version prerelease --preid beta && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin HEAD --tags",
     "release:rc": "node scripts/check-manifest-continuity.js && node scripts/check-docs-changelog.js --type rc && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version prerelease --preid rc && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin HEAD --tags",
     "release:promote": "node scripts/check-manifest-continuity.js && node scripts/check-docs-changelog.js --type promote && pnpm test && git add -A -- ':!docs-site' && (git diff-index --quiet HEAD || git commit -m 'chore: pre-release updates') && pnpm version --no-git-tag-version \"$(node -p \"require('./package.json').version.replace(/-.*/, '')\")\" && V=$(node -p \"require('./package.json').version\") && git add package.json && git commit -m \"$V\" && git tag \"v$V\" && git push origin main --tags",
@@ -79,10 +79,15 @@
     "dist",
     "bin",
     "README.md",
+    "README_CN.md",
     "LICENSE"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/mindfold-ai/trellis.git"
+    "url": "git+https://github.com/bamboo-pan/Trellis.git"
+  },
+  "homepage": "https://github.com/bamboo-pan/Trellis#readme",
+  "bugs": {
+    "url": "https://github.com/bamboo-pan/Trellis/issues"
   }
 }

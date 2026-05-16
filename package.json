@@ -2,14 +2,14 @@
   "private": true,
   "scripts": {
     "prepare": "husky",
-    "build": "pnpm --filter @mindfoldhq/trellis build",
-    "test": "pnpm --filter @mindfoldhq/trellis test",
-    "lint": "pnpm --filter @mindfoldhq/trellis lint",
-    "typecheck": "pnpm --filter @mindfoldhq/trellis typecheck",
-    "release": "pnpm --filter @mindfoldhq/trellis release",
-    "release:minor": "pnpm --filter @mindfoldhq/trellis release:minor",
-    "release:beta": "pnpm --filter @mindfoldhq/trellis release:beta",
-    "release:rc": "pnpm --filter @mindfoldhq/trellis release:rc"
+    "build": "pnpm --filter @bamboo-pan/trellis build",
+    "test": "pnpm --filter @bamboo-pan/trellis test",
+    "lint": "pnpm --filter @bamboo-pan/trellis lint",
+    "typecheck": "pnpm --filter @bamboo-pan/trellis typecheck",
+    "release": "pnpm --filter @bamboo-pan/trellis release",
+    "release:minor": "pnpm --filter @bamboo-pan/trellis release:minor",
+    "release:beta": "pnpm --filter @bamboo-pan/trellis release:beta",
+    "release:rc": "pnpm --filter @bamboo-pan/trellis release:rc"
   },
   "devDependencies": {
     "husky": "^9.1.7",

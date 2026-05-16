@@ -413,15 +413,11 @@ Hook or plugin output that mentions an active task should include the source
 (`session` or `session:<key>`) so cross-window mistakes are visible while
 debugging.
 
-**Also update `task_store.py` when adding a sub-agent-capable platform**:
+`task.py create` seeds `implement.jsonl` / `check.jsonl` for every task. Do not add a platform-specific JSONL seeding registry; JSONL is now the main-session context checklist, not only a sub-agent injection manifest.
 
-| File | Constant | When to update |
-|------|----------|----------------|
-| `src/templates/trellis/scripts/common/task_store.py` | `_SUBAGENT_CONFIG_DIRS` (tuple) | Add `.{configDir}/` if the new platform can spawn sub-agents (Class-1 hook-inject, Class-2 pull-based, or extension-backed) |
+Root `AGENTS.md` template policy must match the current main-agent workflow. `packages/cli/src/templates/markdown/agents.md` must not tell AIs to automatically spawn subagents for parallelizable work, long-running checks, exploration, or risk isolation. Generated platform subagent files may exist for platforms that support them, but root instructions must treat Trellis workflow execution as main-agent-only unless the user explicitly changes that policy in the current request.
 
-This tuple is consulted by `cmd_create` to decide whether to seed `implement.jsonl` / `check.jsonl` for the new task. Agent-less platforms (Kilo, Antigravity, Windsurf) MUST be excluded — they don't consume jsonl.
-
-Same root reason as `cli_adapter.py`: Python scripts run at user-project runtime and can't import from the TS `AI_TOOLS` registry, so they maintain their own parallel registry. When adding/removing sub-agent capability, update both in tandem.
+Same root reason as `cli_adapter.py`: Python scripts run at user-project runtime and can't import from the TS `AI_TOOLS` registry. Keep runtime platform detection registries only where platform behavior genuinely differs.
 
 > **Codex-specific CLIAdapter notes:**
 > - `config_dir_name` returns `".codex"` (not `".agents"`)
@@ -513,7 +509,6 @@ Runtime script registry:
 
 ```python
 Platform = Literal[..., "pi"]
-_SUBAGENT_CONFIG_DIRS = (..., ".pi")
 ```
 
 ### 3. Contracts
@@ -532,15 +527,15 @@ For Pi Agent:
 
 The three injection points (`input` / `before_agent_start` / `tool_call`) are coordinated through `TurnContextCache` so the same turn doesn't re-spawn `get_context.py --mode session-overview`. See "Class-3 injection points (Pi extension)" below the modes table for the runtime contract.
 
-If `agentCapable` is true, `task.py create` must seed `implement.jsonl` / `check.jsonl`, and generated sub-agent definitions or extension code must consume those files.
+Regardless of `agentCapable`, `task.py create` must seed `implement.jsonl` / `check.jsonl`. Main-session workflow guidance consumes those files for implementation/check context; generated sub-agent definitions or extension code may still consume them when a user explicitly runs those agents.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Behavior |
 |---|---|
 | `hasHooks: true` and `hasPythonHooks: false` | Init does not run Windows Python hook detection for the platform |
-| Platform can spawn Trellis sub-agents | Add config dir to `_SUBAGENT_CONFIG_DIRS` |
-| Platform cannot consume JSONL context | Keep it out of `_SUBAGENT_CONFIG_DIRS` even if it has commands/skills |
+| Platform can spawn Trellis sub-agents | Ensure generated agent definitions still consume `implement.jsonl` / `check.jsonl` when invoked explicitly |
+| Platform cannot consume JSONL context | No special seeding behavior; main-session workflow still uses the JSONL files |
 | Generated extension source is tracked | `collectTemplates()` must include the same path written by `configure{Platform}` |
 | Extension path contains `spec/` in a skill name such as `trellis-update-spec` | Template hash exclusion must not drop it; only `.trellis/spec/` is user-owned spec data |
 | Platform uses extension hooks | Do not copy Python hook files into the platform config dir |
@@ -577,7 +572,7 @@ Add or update tests that assert:
 - `configurePlatform("<platform>")` writes every generated file and writes no Python hook files for extension-backed platforms (canonical assertion: `expect(fs.existsSync(".pi/hooks")).toBe(false)` in `test/configurators/platforms.test.ts`).
 - `collectPlatformTemplates("<platform>")` matches init output paths.
 - `init({ <flag>: true })` creates platform assets and tracks hashes for all generated templates.
-- `get_context.py --mode phase --platform <platform>` routes to sub-agent-capable workflow blocks when `agentCapable` is true.
+- `get_context.py --mode phase --platform <platform>` preserves main-session implementation/check routing unless the workflow intentionally defines a platform-specific block.
 - Runtime script copies (`src/templates/trellis/scripts/**` and live `.trellis/scripts/**`) both recognize the platform.
 - The generated extension registers handlers for the three injection points (`input`, `before_agent_start`, `tool_call`) plus the `subagent` custom tool with `promptSnippet`/`promptGuidelines` set to the dispatch protocol constant.
 - The TS-port workflow-state regex (`WORKFLOW_STATE_TAG_RE`) matches the same status names and body content as the Python `_TAG_RE` on a shared fixture from `templates/trellis/workflow.md`.
@@ -1003,17 +998,17 @@ Full reliability audit (per-platform evidence, GitHub issues, Cursor staff confi
 
 ---
 
-## Agent-Curated JSONL Contract (Phase 1.3)
+## Curated JSONL Contract (Phase 1.3)
 
 ### Scope / Trigger
 
-`implement.jsonl` / `check.jsonl` list which spec + research files should be injected into the implement / check sub-agent's prompt. Before v0.5.0-beta.12, `task.py init-context` mechanically generated entries from `dev_type` + package config — which silently produced broken paths on monorepo layouts the script didn't anticipate. Now these files are **agent-curated during Phase 1.3**.
+`implement.jsonl` / `check.jsonl` list which spec + research files the main session should load before implementation/checking. Before v0.5.0-beta.12, `task.py init-context` mechanically generated entries from `dev_type` + package config — which silently produced broken paths on monorepo layouts the script didn't anticipate. Now these files are **AI-curated during Phase 1.3**.
 
 ### Lifecycle
 
-1. **Seed** — `task.py create` writes **one line** to each jsonl when a sub-agent-capable platform is detected (see `_SUBAGENT_CONFIG_DIRS` in Step 6). Agent-less platforms skip seeding.
+1. **Seed** — `task.py create` writes **one line** to each jsonl for every new task.
 2. **Curate** — AI executes Phase 1.3 per `workflow.md`: replaces the seed line with real `{file, reason}` entries pointing at spec files or `research/*.md`. **Code paths are forbidden**; code gets read in Phase 2.
-3. **Consume** — hook / prelude reads the file and injects referenced content into the sub-agent prompt.
+3. **Consume** — the main session reads curated entries before implementation/checking. Hooks / preludes may also read the files when optional sub-agents are invoked explicitly.
 
 ### Signatures
 
@@ -1036,9 +1031,9 @@ Optional `type: "directory"` for directory entries. Consumers ignore any other f
 | Contract | Enforcer | Behavior |
 |---|---|---|
 | Seed detection | Every consumer | Row without a `file` key is treated as non-entry (silently skipped; no error) |
-| Empty-file tolerance | `read_jsonl_entries` in `shared-hooks/inject-subagent-context.py` | Missing file or seed-only file → empty list returned + single stderr warning (not an exception) |
+| Empty-file tolerance | JSONL readers | Missing file or seed-only file → empty list returned + diagnostic warning where applicable (not an exception) |
 | READY detection | `session-start.py` / `session-start.js` per platform | A task is "ready to implement" ONLY if at least one curated (non-seed) row exists. File existence alone is NOT ready. |
-| Class-2 prelude fallback | `buildPullBasedPrelude` in `configurators/shared.ts` | If jsonl has no `file` entries, sub-agent reads prd.md and judges which specs apply from context |
+| Optional sub-agent fallback | Agent definitions / preludes | If jsonl has no `file` entries, an explicitly invoked sub-agent reads prd.md and judges which specs apply from context |
 
 ### Validation & Error Matrix
 
@@ -1046,8 +1041,8 @@ Optional `type: "directory"` for directory entries. Consumers ignore any other f
 |---|---|---|
 | `implement.jsonl` has only seed row | `cmd_validate` reports 0 errors; `cmd_list_context` prints "(no curated entries yet — only seed row)" | Exit 0 |
 | `implement.jsonl` entry points at non-existent file | `cmd_validate` prints "File not found: …" per row | Exit 1 |
-| Sub-agent platform detected, but `cmd_create` fails to write seed | Create succeeds, but sub-agent dispatch later sees a missing jsonl and hook warns | Exit 0 on create, stderr warn on consume |
-| Agent-less platform mistakenly added to `_SUBAGENT_CONFIG_DIRS` | Task gets useless seeded jsonl that no hook/prelude consumes | No error, just clutter — catch in review |
+| `cmd_create` fails to write seed | Create succeeds only if task dir exists, but Phase 1.3 will report missing/empty context files | User-visible readiness guidance |
+| Platform-specific seeding registry reintroduced | Some platforms skip JSONL and cannot use Phase 1.3 as a durable context checklist | Regression test failure / review blocker |
 
 ### Wrong vs Correct
 
@@ -1246,13 +1241,13 @@ Codex has even tighter limits — users report 40-80 KB payloads consuming most 
 | `<ready>` | 0.3 KB | Fixed |
 | **Total** | **17.1 KB** | **Under 20 KB ✓** |
 
-Historical note: pre-workflow-rewrite (v0.4.0-beta.10) the payload included a 16 KB `<instructions>` block (start.md content). That block was removed — start.md is now only sent as the `/start` command body for agent-less platforms (Kilo/Antigravity/Windsurf); agent-capable platforms get workflow overview via `<workflow>` instead.
+Historical note: pre-workflow-rewrite (v0.4.0-beta.10) the payload included a 16 KB `<instructions>` block (start.md content). That block was removed — start.md is now only sent where a platform exposes it as an explicit command/prompt; hook-backed platforms get workflow overview via `<workflow>` instead.
 
 ### Guidelines: Paths-only vs Inline
 
-Before: every `.trellis/spec/*/index.md` was inlined in `<guidelines>` (10 KB+ on this repo). Main agent rarely uses index content (work is delegated to sub-agents, which get their own specific specs via `{task}/implement.jsonl` / `check.jsonl`).
+Before: every `.trellis/spec/*/index.md` was inlined in `<guidelines>` (10 KB+ on this repo). The main session now uses index paths plus curated `{task}/implement.jsonl` / `check.jsonl` entries to load only relevant specs.
 
-Now: paths only for most indexes; `guides/index.md` (cross-package thinking guides) stays inlined because it's small and applies broadly. Agent-capable platforms should delegate implementation/check work to sub-agents so `implement.jsonl` / `check.jsonl` context is loaded there; agent-less platforms that edit in the main session read the relevant index on demand.
+Now: paths only for most indexes; `guides/index.md` (cross-package thinking guides) stays inlined because it's small and applies broadly. All platforms should route implementation/check work through the main session by default; optional sub-agents may still read JSONL context when explicitly invoked.
 
 ### READY Guidance Must Be a Single Action
 

@@ -375,10 +375,9 @@ exists under \`.trellis/tasks/\`. When they want to work on it, they should star
 this task from a session that provides Trellis session identity.
 
 **Your job**: help them populate \`.trellis/spec/\` with the team's real
-coding conventions. Every future AI session — this project's
-\`trellis-implement\` and \`trellis-check\` sub-agents — auto-loads spec files
-listed in per-task jsonl manifests. Empty spec = sub-agents write generic
-code. Real spec = sub-agents match the team's actual patterns.
+coding conventions. Every future AI session uses spec files listed in per-task
+jsonl manifests before main-session implementation and checking. Empty spec =
+generic code. Real spec = the AI matches the team's actual patterns.
 
 Don't dump instructions. Open with a short greeting, figure out if the repo
 has any existing convention docs (CLAUDE.md, .cursorrules, etc.), and drive
@@ -464,8 +463,8 @@ Scan real code to discover patterns. Before writing each spec file:
 ### Step 3: Document reality, not ideals
 
 **Critical**: write what the code *actually does*, not what it should do.
-Sub-agents match the spec, so aspirational patterns that don't exist in the
-codebase will cause sub-agents to write code that looks out of place.
+The main session follows the spec, so aspirational patterns that don't exist
+in the codebase will cause the AI to write code that looks out of place.
 
 If the team has known tech debt, document the current state — improvement
 is a separate conversation, not a bootstrap concern.
@@ -474,13 +473,11 @@ is a separate conversation, not a bootstrap concern.
 
 ## Quick explainer of the runtime (share when they ask "why do we need spec at all")
 
-- Every AI coding task spawns two sub-agents: \`trellis-implement\` (writes
-  code) and \`trellis-check\` (verifies quality).
-- Each task has \`implement.jsonl\` / \`check.jsonl\` manifests listing which
-  spec files to load.
-- The platform hook auto-injects those spec files + the task's \`prd.md\`
-  into every sub-agent prompt, so the sub-agent codes/reviews per team
-  conventions without anyone pasting them manually.
+- Each AI coding task uses \`implement.jsonl\` / \`check.jsonl\` manifests
+  listing which spec files to load.
+- The main session reads those specs + the task's \`prd.md\` before coding and
+  checking, so work follows team conventions without anyone pasting them
+  manually.
 - Source of truth: \`.trellis/spec/\`. That's why filling it well now pays
   off forever.
 
@@ -658,13 +655,11 @@ code every session.
   carrying the current task + phase hint.
 - **\`/trellis:continue\`** loads the Phase Index, reads \`prd.md\` + recent
   activity, and routes to the right skill (\`trellis-brainstorm\` for planning,
-  \`trellis-implement\` for coding, \`trellis-check\` for verification).
-- **\`trellis-implement\` sub-agent** is spawned when code needs to be written.
-  The platform hook reads \`{TASK_DIR}/implement.jsonl\` and auto-injects those
-  spec files + \`prd.md\` into the sub-agent's prompt so it codes per project
-  conventions.
-- **\`trellis-check\` sub-agent** follows the same pattern with \`check.jsonl\`
-  — reviews changes against specs, auto-fixes issues, runs lint/typecheck.
+  \`trellis-before-dev\` before coding, \`trellis-check\` for verification).
+- **Main-session implementation** reads \`{TASK_DIR}/implement.jsonl\` +
+  \`prd.md\`, then writes code per project conventions.
+- **Main-session checking** reads \`{TASK_DIR}/check.jsonl\`, reviews changes
+  against specs, fixes issues, and runs lint/typecheck.
 
 File layout (mention when they ask "where does what live"):
 - \`.trellis/.runtime/sessions/<session>.json\` — session active-task state, gitignored
@@ -698,7 +693,7 @@ File layout (mention when they ask "where does what live"):
 
 If they want to practice before touching real work, offer to pick a tiny
 P3 task or a typo fix and run the full cycle together: \`/trellis:continue\`
-→ you implement via sub-agents → \`/trellis:finish-work\`.
+→ you implement in the main session → \`/trellis:finish-work\`.
 
 ---
 

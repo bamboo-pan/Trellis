@@ -514,6 +514,10 @@ function writeFixtureFiles(root: string, files: Record<string, string>): void {
   }
 }
 
+function readTextNormalized(filePath: string): string {
+  return fs.readFileSync(filePath, "utf-8").replace(/\r\n/g, "\n");
+}
+
 interface GitRegistryFixture {
   tmpDir: string;
   repoDir: string;
@@ -662,10 +666,7 @@ gitDescribe("git-backed registry backend", () => {
 
         expect(result.success).toBe(true);
         expect(
-          fs.readFileSync(
-            path.join(cwd, ".trellis", "spec", "rules.md"),
-            "utf-8",
-          ),
+          readTextNormalized(path.join(cwd, ".trellis", "spec", "rules.md")),
         ).toBe("remote rules\n");
       },
     );
@@ -716,10 +717,7 @@ gitDescribe("git-backed registry backend", () => {
 
         expect(result.success).toBe(true);
         expect(
-          fs.readFileSync(
-            path.join(cwd, ".trellis", "spec", "rules.md"),
-            "utf-8",
-          ),
+          readTextNormalized(path.join(cwd, ".trellis", "spec", "rules.md")),
         ).toBe("remote rules\n");
       },
     );
@@ -748,10 +746,10 @@ gitDescribe("git-backed registry backend", () => {
         const result = await downloadRegistryDirect(cwd, registry, "append");
 
         expect(result.success).toBe(true);
-        expect(fs.readFileSync(path.join(specDir, "keep.md"), "utf-8")).toBe(
+        expect(readTextNormalized(path.join(specDir, "keep.md"))).toBe(
           "local keep\n",
         );
-        expect(fs.readFileSync(path.join(specDir, "new.md"), "utf-8")).toBe(
+        expect(readTextNormalized(path.join(specDir, "new.md"))).toBe(
           "remote new\n",
         );
       },

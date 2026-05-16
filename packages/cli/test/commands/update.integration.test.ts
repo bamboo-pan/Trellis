@@ -69,11 +69,12 @@ function writeHashesV2(hashFile: string, hashes: Record<string, string>): void {
 function removeSubagentsSection(content: string): string {
   return content.replace(
     "\n## Subagents\n\n" +
-      "- ALWAYS wait for all subagents to complete before yielding.\n" +
-      "- Spawn subagents automatically when:\n" +
-      "  - Parallelizable work (e.g., install + verify, npm test + typecheck, multiple tasks from plan)\n" +
-      "  - Long-running or blocking tasks where a worker can run independently.\n" +
-      "  - Isolation for risky changes or checks\n",
+      "This Trellis workflow is main-agent-only.\n" +
+      "\n" +
+      "- Do not spawn or delegate to subagents for Trellis workflow steps.\n" +
+      "- The main agent must perform context loading, research persistence, implementation, verification, spec-update gates, and finish/commit steps directly.\n" +
+      "- If a platform exposes Trellis subagent files, treat them as disabled for this workflow unless the user explicitly changes the policy in the current request.\n" +
+      "- Never use subagents merely because work is parallelizable, long-running, exploratory, or risk-isolated.\n",
     "",
   );
 }
@@ -565,7 +566,10 @@ describe("update() integration", () => {
     expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toBe(expectedWorkflow);
     expect(readProjectFile(MANAGED_FILE)).toBe(expectedGetContext);
     expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toContain(
-      "[codex-inline, Kilo, Antigravity, Windsurf]",
+      "main-session implement",
+    );
+    expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toContain(
+      "implement directly in the main session",
     );
     expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).not.toContain(
       "[Codex]",
@@ -1056,8 +1060,8 @@ describe("update() integration", () => {
 
     const updated = fs.readFileSync(workflowPath, "utf-8");
     expect(updated).toBe(replacePythonCommandLiterals(workflowMdTemplate));
-    expect(updated).toContain("[codex-sub-agent]");
-    expect(updated).toContain("[codex-inline, Kilo, Antigravity, Windsurf]");
+    expect(updated).toContain("main-session implement");
+    expect(updated).toContain("implement directly in the main session");
     expect(updated).not.toContain("[Codex]");
     expect(updated).not.toContain("[Kilo, Antigravity, Windsurf]");
     expect(updated).not.toContain("legacy body");

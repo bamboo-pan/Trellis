@@ -55,6 +55,10 @@ export {
   return moduleObject.exports as unknown as PiExtensionInternals;
 }
 
+function normalizeLineEndings(content: string): string {
+  return content.replace(/\r\n/g, "\n");
+}
+
 describe("pi templates", () => {
   it("provides the three Trellis sub-agent definitions", () => {
     const agents = getAllAgents();
@@ -374,7 +378,7 @@ fallbackModels:
   });
 
   it("input and before_agent_start hooks both surface workflow-state breadcrumb", () => {
-    const extension = getExtensionTemplate();
+    const extension = normalizeLineEndings(getExtensionTemplate());
 
     // before_agent_start: workflow-state appended to systemPrompt alongside
     // the existing PRD / jsonl context (must not replace, must not skip).

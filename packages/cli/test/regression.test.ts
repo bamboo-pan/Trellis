@@ -68,6 +68,15 @@ afterEach(() => {
   clearManifestCache();
 });
 
+const pythonCmd = process.platform === "win32" ? "python" : "python3";
+
+function markdownFrontmatter(content: string): string {
+  return /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(content)?.[1]?.replace(
+    /\r\n/g,
+    "\n",
+  ) ?? "";
+}
+
 // =============================================================================
 // 1. Windows / Encoding Regressions
 // =============================================================================
@@ -351,7 +360,7 @@ ${separator}
 
   function runAddSession(title: string, options?: { branch?: string }): void {
     const command = [
-      "python3",
+      pythonCmd,
       JSON.stringify(
         path.join(tmpDir, ".trellis", "scripts", "add_session.py"),
       ),
@@ -2436,7 +2445,7 @@ describe("regression: current-task path normalization", () => {
     );
   });
 
-  it("[workflow-v2] shared session-start READY guidance requires implement/check sub-agents", () => {
+  it("[workflow-v2] shared session-start READY guidance uses main-session implement/check", () => {
     setupTaskRepo();
     writeSessionContext("claude_session-a", ".trellis/tasks/issue-106");
 
@@ -2449,15 +2458,11 @@ describe("regression: current-task path normalization", () => {
       path.join(".claude", "hooks", "session-start.py"),
       JSON.stringify({ cwd: tmpDir, session_id: "session-a" }),
     );
-    expect(rawOutput).toContain(
-      "Next required action: dispatch `trellis-implement`",
-    );
-    expect(rawOutput).toContain("default is to NOT edit code in the main session");
-    expect(rawOutput).toContain("dispatch `trellis-check`");
-    expect(rawOutput).not.toContain("if you stay in the main session");
-    expect(rawOutput).not.toContain(
-      "load `trellis-before-dev` before writing code",
-    );
+    expect(rawOutput).toContain("Next required action: load `trellis-before-dev`");
+    expect(rawOutput).toContain("implement directly in the main session");
+    expect(rawOutput).toContain("load/run `trellis-check` in the main session");
+    expect(rawOutput).not.toContain("dispatch `trellis-implement`");
+    expect(rawOutput).not.toContain("dispatch `trellis-check`");
     expect(rawOutput).not.toContain("If there is an active task, ask whether");
     expect(rawOutput).toContain(
       "execute its Next required action without asking whether to continue",
@@ -2682,7 +2687,7 @@ describe("regression: current-task path normalization", () => {
     );
     // Hardcoded fallback wording must NOT appear post-R5
     expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
-      "trellis-implement → trellis-check",
+      "main-session implement → main-session check",
     );
   });
 
@@ -2695,7 +2700,7 @@ describe("regression: current-task path normalization", () => {
     // regressions that omit Phase 3.4 from the per-turn breadcrumb.
     writeWorkflowMd(
       "[workflow-state:in_progress]\n" +
-        "Flow: trellis-implement → trellis-check → trellis-update-spec → commit (Phase 3.4) → /trellis:finish-work\n" +
+        "Flow: main-session implement → main-session check → trellis-update-spec → commit (Phase 3.4) → /trellis:finish-work\n" +
         "[/workflow-state:in_progress]\n",
     );
 
@@ -2722,7 +2727,7 @@ describe("regression: current-task path normalization", () => {
       "CUSTOM BODY from workflow.md",
     );
     expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
-      "trellis-implement → trellis-check",
+      "main-session implement → main-session check",
     );
   });
 
@@ -2926,9 +2931,10 @@ describe("regression: current-task path normalization", () => {
   // v0.5.0-beta.12: init-context removal + jsonl seeding on task create
   // ------------------------------------------------------------
 
-  it("[init-context-removal] task.py create does NOT seed jsonl when no sub-agent platform configured", () => {
+  it("[single-flow] task.py create seeds jsonl even when no sub-agent platform is configured", () => {
     setupTaskRepo();
-    // setupTaskRepo does not create any .{platform}/ dir → agent-less mode
+    // setupTaskRepo does not create any .{platform}/ dir. Single-flow still
+    // uses jsonl as main-session context checklists.
     const taskScriptPath = path.join(tmpDir, ".trellis", "scripts", "task.py");
     execSync(
       `${pythonCmd} ${JSON.stringify(taskScriptPath)} create "plain task" --slug plain-task --assignee test-dev`,
@@ -2940,11 +2946,11 @@ describe("regression: current-task path normalization", () => {
       .filter((d) => d.includes("plain-task"));
     expect(newDirs.length).toBeGreaterThan(0);
     const taskDir = path.join(tasksDir, newDirs[0]);
-    expect(fs.existsSync(path.join(taskDir, "implement.jsonl"))).toBe(false);
-    expect(fs.existsSync(path.join(taskDir, "check.jsonl"))).toBe(false);
+    expect(fs.existsSync(path.join(taskDir, "implement.jsonl"))).toBe(true);
+    expect(fs.existsSync(path.join(taskDir, "check.jsonl"))).toBe(true);
   });
 
-  it("[init-context-removal] task.py create seeds jsonl when a sub-agent platform dir exists", () => {
+  it("[single-flow] task.py create seeds jsonl when a platform dir exists", () => {
     setupTaskRepo();
     // Simulate a Claude Code install
     fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
@@ -3249,9 +3255,9 @@ print(len(entries))
       "spec = importlib.util.spec_from_file_location('ss', pathlib.Path('.claude/hooks/session-start.py'))",
       "mod = importlib.util.module_from_spec(spec)",
       "spec.loader.exec_module(mod)",
-      "matched = '[workflow-state:planning]\\nbody\\n[/workflow-state:planning]'",
-      "mismatched = '[workflow-state:planning]\\nbody\\n[/workflow-state:in_progress]'",
-      "nested_orphan = '[workflow-state:planning]\\nbody1\\n[/workflow-state:other]\\ntail\\n[/workflow-state:planning]'",
+      "matched = chr(10).join(['[workflow-state:planning]', 'body', '[/workflow-state:planning]'])",
+      "mismatched = chr(10).join(['[workflow-state:planning]', 'body', '[/workflow-state:in_progress]'])",
+      "nested_orphan = chr(10).join(['[workflow-state:planning]', 'body1', '[/workflow-state:other]', 'tail', '[/workflow-state:planning]'])",
       "result = {'M': mod._strip_breadcrumb_tag_blocks(matched), 'X': mod._strip_breadcrumb_tag_blocks(mismatched), 'N': mod._strip_breadcrumb_tag_blocks(nested_orphan)}",
       "print(json.dumps(result))",
     ].join("; ");
@@ -3311,15 +3317,15 @@ print(len(entries))
     expect(output).not.toContain("## Workflow State Breadcrumbs");
   });
 
-  it("[workflow-v2] --mode phase --platform codex (sub-agent mode) filters out generic before-dev routing", () => {
+  it("[workflow-v2] --mode phase --platform codex uses main-session routing", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       templateWorkflowMd(),
     );
-    // Codex defaults to inline since 0.5.9; opt into sub-agent dispatch
-    // explicitly so the legacy spawn-trellis-implement block surfaces.
+    // Single-flow routing keeps Codex in the main session even if an older
+    // config still opts into sub-agent dispatch mode.
     writeConfigYaml("codex:\n  dispatch_mode: sub-agent\n");
 
     const contextScript = path.join(
@@ -3333,14 +3339,12 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("trellis-implement");
-    expect(output).not.toContain(
-      "| About to write code / start implementing | trellis-before-dev |",
-    );
-    expect(output).not.toContain("before-dev takes under a minute");
+    expect(output).toContain("trellis-before-dev");
+    expect(output).toContain("main session");
+    expect(output).not.toContain("Dispatch the `trellis-implement` sub-agent");
   });
 
-  it("[pi] --mode phase --platform pi uses sub-agent routing", () => {
+  it("[pi] --mode phase --platform pi uses main-session routing", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -3359,23 +3363,21 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("trellis-implement");
+    expect(output).toContain("trellis-before-dev");
     expect(output).toContain("implement.jsonl");
-    expect(output).not.toContain(
-      "| About to write code / start implementing | trellis-before-dev |",
-    );
-    expect(output).not.toContain("before-dev takes under a minute");
+    expect(output).toContain("main session");
+    expect(output).not.toContain("Dispatch the `trellis-implement` sub-agent");
   });
 
-  it("[workflow-v2] step 2.1 for codex (sub-agent mode) describes self-loaded agent context, not hook injection", () => {
+  it("[workflow-v2] step 2.1 for codex describes main-session context loading", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       templateWorkflowMd(),
     );
-    // Codex defaults to inline since 0.5.9; opt into sub-agent dispatch
-    // explicitly so the [codex-sub-agent] block surfaces.
+    // Single-flow routing keeps Codex in the main session even if an older
+    // config still opts into sub-agent dispatch mode.
     writeConfigYaml("codex:\n  dispatch_mode: sub-agent\n");
 
     const contextScript = path.join(
@@ -3389,15 +3391,13 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("The Codex sub-agent definition auto-handles");
-    expect(output).toContain(
-      "Resolves the active task with `task.py current --source`",
-    );
+    expect(output).toContain("Load the `trellis-before-dev` skill");
+    expect(output).toContain("Read `{TASK_DIR}/prd.md`");
+    expect(output).not.toContain("The Codex sub-agent definition auto-handles");
     expect(output).not.toContain("The platform hook/plugin auto-handles");
-    expect(output).not.toContain("Load the `trellis-before-dev` skill");
   });
 
-  it("[pi] step 2.1 describes extension-backed sub-agent context path", () => {
+  it("[pi] step 2.1 describes main-session context loading", () => {
     writeTrellisScripts();
     writeProjectFile(path.join(".trellis", ".developer"), "name=test\n");
     writeProjectFile(
@@ -3416,10 +3416,10 @@ print(len(entries))
       { cwd: tmpDir, encoding: "utf-8" },
     );
 
-    expect(output).toContain("The platform hook/plugin auto-handles");
-    expect(output).toContain("Reads `implement.jsonl`");
+    expect(output).toContain("Load the `trellis-before-dev` skill");
+    expect(output).toContain("Read `{TASK_DIR}/prd.md`");
     expect(output).not.toContain("The Codex sub-agent definition auto-handles");
-    expect(output).not.toContain("Load the `trellis-before-dev` skill");
+    expect(output).not.toContain("The platform hook/plugin auto-handles");
   });
 
   it("[workflow-v2] --mode phase --platform kilo keeps trellis-before-dev routing (agent-less path)", () => {
@@ -3648,7 +3648,7 @@ print(len(entries))
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       "[workflow-state:in_progress]\n" +
-        "DISPATCH the trellis-implement / trellis-check sub-agents.\n" +
+        "PLAIN status block.\n" +
         "[/workflow-state:in_progress]\n" +
         "[workflow-state:in_progress-inline]\n" +
         "MAIN SESSION edits code via trellis-before-dev directly.\n" +
@@ -3660,7 +3660,7 @@ print(len(entries))
     ) as { hookSpecificOutput: { additionalContext: string } };
     const ctx = parsed.hookSpecificOutput.additionalContext;
     expect(ctx).toContain("MAIN SESSION edits code");
-    expect(ctx).not.toContain("DISPATCH the trellis-implement");
+    expect(ctx).not.toContain("PLAIN status block");
   });
 
   it("[issue-codex-dispatch-mode] codex breadcrumb routes to plain status when codex.dispatch_mode=sub-agent", () => {
@@ -3670,7 +3670,7 @@ print(len(entries))
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       "[workflow-state:in_progress]\n" +
-        "DISPATCH the trellis-implement / trellis-check sub-agents.\n" +
+        "PLAIN status block.\n" +
         "[/workflow-state:in_progress]\n" +
         "[workflow-state:in_progress-inline]\n" +
         "MAIN SESSION edits code via trellis-before-dev directly.\n" +
@@ -3682,7 +3682,7 @@ print(len(entries))
       runPython(codexHookPath, JSON.stringify({ cwd: tmpDir, session_id: "workflow-a" })),
     ) as { hookSpecificOutput: { additionalContext: string } };
     const ctx = parsed.hookSpecificOutput.additionalContext;
-    expect(ctx).toContain("DISPATCH the trellis-implement");
+    expect(ctx).toContain("PLAIN status block");
     expect(ctx).not.toContain("MAIN SESSION edits code");
   });
 
@@ -3693,7 +3693,7 @@ print(len(entries))
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       "[workflow-state:in_progress]\n" +
-        "DISPATCH the trellis-implement / trellis-check sub-agents.\n" +
+        "PLAIN status block.\n" +
         "[/workflow-state:in_progress]\n" +
         "[workflow-state:in_progress-inline]\n" +
         "MAIN SESSION edits code via trellis-before-dev directly.\n" +
@@ -3707,7 +3707,7 @@ print(len(entries))
     const ctx = parsed.hookSpecificOutput.additionalContext;
     expect(ctx).toContain("MAIN SESSION edits code");
     expect(ctx).toContain("trellis-before-dev");
-    expect(ctx).not.toContain("DISPATCH the trellis-implement");
+    expect(ctx).not.toContain("PLAIN status block");
   });
 
   it("[issue-codex-dispatch-mode] non-codex platform ignores codex.dispatch_mode=inline", () => {
@@ -3726,7 +3726,7 @@ print(len(entries))
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
       "[workflow-state:in_progress]\n" +
-        "DISPATCH the trellis-implement / trellis-check sub-agents.\n" +
+        "PLAIN status block.\n" +
         "[/workflow-state:in_progress]\n" +
         "[workflow-state:in_progress-inline]\n" +
         "MAIN SESSION edits code via trellis-before-dev directly.\n" +
@@ -3738,7 +3738,7 @@ print(len(entries))
       runPython(claudeHookPath, JSON.stringify({ cwd: tmpDir, session_id: "workflow-a" })),
     ) as { hookSpecificOutput: { additionalContext: string } };
     const ctx = parsed.hookSpecificOutput.additionalContext;
-    expect(ctx).toContain("DISPATCH the trellis-implement");
+    expect(ctx).toContain("PLAIN status block");
     expect(ctx).not.toContain("MAIN SESSION edits code");
   });
 
@@ -3910,7 +3910,7 @@ print(len(entries))
     );
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
-      "[workflow-state:in_progress]\nDISPATCH the trellis-implement.\n[/workflow-state:in_progress]\n[workflow-state:in_progress-inline]\nMAIN SESSION inline edit.\n[/workflow-state:in_progress-inline]\n",
+      "[workflow-state:in_progress]\nPLAIN status block.\n[/workflow-state:in_progress]\n[workflow-state:in_progress-inline]\nMAIN SESSION inline edit.\n[/workflow-state:in_progress-inline]\n",
     );
 
     // Default (no config.yaml) → inline banner.
@@ -3946,7 +3946,7 @@ print(len(entries))
     );
     writeProjectFile(
       path.join(".trellis", "workflow.md"),
-      "[workflow-state:in_progress]\nDISPATCH the trellis-implement.\n[/workflow-state:in_progress]\n",
+      "[workflow-state:in_progress]\nPLAIN status block.\n[/workflow-state:in_progress]\n",
     );
     writeConfigYaml("codex:\n  dispatch_mode: inline\n");
 
@@ -4277,21 +4277,18 @@ describe("regression: cli_adapter platform support (beta.9, beta.13, beta.16)", 
     expect(taskContext as string).toMatch(/def cmd_list_context\b/);
   });
 
-  it("[init-context-removal] task_store.cmd_create seeds jsonl for sub-agent platforms", () => {
+  it("[single-flow] task_store.cmd_create seeds jsonl for every task", () => {
     const taskStore = getAllScripts().get("common/task_store.py");
     expect(taskStore).toBeDefined();
-    // Sub-agent platform probe.
-    expect(taskStore as string).toMatch(/_SUBAGENT_CONFIG_DIRS/);
-    expect(taskStore as string).toContain('".claude"');
-    expect(taskStore as string).toContain('".codex"');
-    expect(taskStore as string).toContain('".github/copilot"');
-    expect(taskStore as string).toContain('".pi"');
+    expect(taskStore as string).not.toMatch(/_SUBAGENT_CONFIG_DIRS/);
+    expect(taskStore as string).not.toMatch(/_has_subagent_platform/);
     // Seed row is self-describing and has no `file` field (so consumers skip
     // it naturally).
     expect(taskStore as string).toMatch(/_write_seed_jsonl/);
     expect(taskStore as string).toContain('"_example"');
-    // cmd_create calls into the seed path.
-    expect(taskStore as string).toMatch(/_has_subagent_platform\(repo_root\)/);
+    // cmd_create always seeds the main-session context checklists.
+    expect(taskStore as string).toContain('("implement.jsonl", "check.jsonl")');
+    expect(taskStore as string).toContain("Seed implement.jsonl / check.jsonl for every task");
   });
 
   // Regression for 04-22-migrate-flow-bugs Bug C: breaking releases must
@@ -4811,7 +4808,7 @@ describe("regression: parse_simple_yaml Python execution (0.3.8)", () => {
       "print(json.dumps(result))",
     ].join("\n");
     fs.writeFileSync(scriptFile, script);
-    const out = execSync(`python3 ${JSON.stringify(scriptFile)}`, {
+    const out = execSync(`${pythonCmd} ${JSON.stringify(scriptFile)}`, {
       encoding: "utf-8",
     });
     return JSON.parse(out.trim());
@@ -5006,7 +5003,7 @@ describe("regression: copilot agents use YAML tools frontmatter", () => {
       path.join(tmpDir, ".github/agents/trellis-implement.agent.md"),
       "utf-8",
     );
-    const frontmatter = content.split("---\n")[1] ?? "";
+    const frontmatter = markdownFrontmatter(content);
 
     expect(frontmatter).toContain(
       "tools:\n  - read\n  - edit\n  - execute\n  - search\n  - web\n  - exa/*",
@@ -5021,7 +5018,7 @@ describe("regression: copilot agents use YAML tools frontmatter", () => {
       path.join(tmpDir, ".github/agents/trellis-research.agent.md"),
       "utf-8",
     );
-    const frontmatter = content.split("---\n")[1] ?? "";
+    const frontmatter = markdownFrontmatter(content);
 
     expect(frontmatter).toContain("tools:\n  - read");
     expect(frontmatter).toContain("  - edit");
@@ -5119,7 +5116,7 @@ describe("regression: research agent persists findings to task dir", () => {
     it(`[${rel}] has Write tool and persist instruction`, () => {
       const content = fs.readFileSync(path.join(repoRoot, rel), "utf-8");
       // Frontmatter tool list must include Write (capitalized form)
-      const fm = content.split("---\n")[1] ?? "";
+      const fm = markdownFrontmatter(content);
       expect(fm).toMatch(/tools:\s*[^\n]*\bWrite\b/);
       // Body must reference persist target
       expect(content).toContain("{TASK_DIR}/research/");
@@ -5137,7 +5134,7 @@ describe("regression: research agent persists findings to task dir", () => {
   it("[packages/cli/src/templates/gemini/agents/trellis-research.md] omits tools line + has persist instruction", () => {
     const rel = "packages/cli/src/templates/gemini/agents/trellis-research.md";
     const content = fs.readFileSync(path.join(repoRoot, rel), "utf-8");
-    const fm = content.split("---\n")[1] ?? "";
+    const fm = markdownFrontmatter(content);
     expect(fm).not.toMatch(/^tools:/m);
     expect(content).toContain("{TASK_DIR}/research/");
     expect(content).toMatch(/PERSIST|[Pp]ersist/);
@@ -5182,7 +5179,7 @@ describe("regression: research agent persists findings to task dir", () => {
       ),
       "utf-8",
     );
-    const fm = content.split("---\n")[1] ?? "";
+    const fm = markdownFrontmatter(content);
     // OpenCode uses YAML permission block, not Claude-style `tools:` list
     expect(fm).toMatch(/^\s*write:\s*allow\s*$/m);
     expect(fm).toMatch(/^\s*edit:\s*allow\s*$/m);
@@ -5285,7 +5282,7 @@ describe("regression: Gemini CLI 0.40.x template compatibility (#224)", () => {
         path.join(geminiAgentsDir, entry),
         "utf-8",
       );
-      const fm = content.split("---\n")[1] ?? "";
+      const fm = markdownFrontmatter(content);
       expect(
         fm,
         `gemini/agents/${entry} must NOT include a tools: line — Gemini CLI 0.40+ rejects the comma-separated form`,
@@ -5473,7 +5470,7 @@ describe("regression: session-start.py f-string Python <=3.11 compat (0.5.2)", (
       // regex test above is the primary gate. On macOS system Python 3.9 or
       // any CI runner with python3 < 3.12 this is a hard catch.
       const r = spawnSync(
-        "python3",
+        pythonCmd,
         [
           "-c",
           `import ast,sys; ast.parse(open(sys.argv[1], encoding='utf-8').read()); print('OK')`,
@@ -5481,12 +5478,12 @@ describe("regression: session-start.py f-string Python <=3.11 compat (0.5.2)", (
         ],
         { encoding: "utf-8" },
       );
-      // If python3 is unavailable on the runner, skip silently — the regex
+      // If Python is unavailable on the runner, skip silently — the regex
       // assertion above already covers the regression deterministically.
       if (r.error && (r.error as NodeJS.ErrnoException).code === "ENOENT") return;
       expect(
         r.status,
-        `python3 ast.parse failed for ${rel}:\n${r.stderr ?? ""}`,
+        `${pythonCmd} ast.parse failed for ${rel}:\n${r.stderr ?? ""}`,
       ).toBe(0);
       expect(r.stdout ?? "").toContain("OK");
     });
@@ -5608,25 +5605,17 @@ describe("regression: sub-agent context injection fallback (0.5.3)", () => {
     }
   });
 
-  it("workflow.md dispatch protocol covers all platforms (not class-2 only)", () => {
+  it("workflow.md uses main-session implementation instead of sub-agent dispatch protocol", () => {
     const workflowPath = path.join(
       repoRootFb,
       "packages/cli/src/templates/trellis/workflow.md",
     );
     const wf = fs.readFileSync(workflowPath, "utf-8");
-    // The protocol enforces `Active task: <path>` for ALL sub-agents (no
-    // trellis-research carve-out as of 0.5.8 — research sub-agents need the
-    // task path to know which `{task_dir}/research/` to write into).
-    expect(wf).toContain("Sub-agent dispatch protocol");
-    expect(wf).toContain("all platforms");
-    expect(wf).toContain("all sub-agents");
-    expect(wf).not.toContain("EXCEPT trellis-research");
-    expect(wf).toContain("trellis-research");
-    expect(wf).toContain("Active task:");
-    // Must NOT scope the rule to class-2 only — that was the pre-0.5.3 limit.
-    expect(wf).not.toMatch(
-      /Sub-agent dispatch protocol \(class-2 platforms[^)]*\)/,
-    );
+    expect(wf).toContain("main-session implement");
+    expect(wf).toContain("implement directly in the main session");
+    expect(wf).toContain("load/run `trellis-check` in the main session");
+    expect(wf).not.toContain("Sub-agent dispatch protocol");
+    expect(wf).not.toContain("Active task:");
   });
 });
 
