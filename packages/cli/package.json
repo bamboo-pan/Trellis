@@ -1,6 +1,6 @@
 {
   "name": "@bamboo-pan/trellis",
-  "version": "0.5.16-single.0",
+  "version": "0.5.16-single.1",
   "description": "bamboo-pan fork of Trellis, an AI coding harness for progressive specs, workflows, task context, and memory",
   "type": "module",
   "main": "./dist/index.js",
