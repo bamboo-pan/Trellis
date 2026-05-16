@@ -1,0 +1,9 @@
+{
+  "version": "0.5.0-multi.0",
+  "description": "Fork package release for the bamboo-pan multi distribution. No migrations beyond the upstream 0.5.0 chain.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fork Release:**\n- Publish the bamboo-pan multi distribution as `@bamboo-pan/trellis` with npm dist-tag `multi`.",
+  "migrations": [],
+  "notes": "No migration required. This manifest records the published fork npm version so manifest continuity checks preserve the fork update chain."
+}

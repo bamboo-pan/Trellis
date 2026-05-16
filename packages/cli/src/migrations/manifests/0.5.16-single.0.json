@@ -1,0 +1,9 @@
+{
+  "version": "0.5.16-single.0",
+  "description": "Fork package release for the bamboo-pan single distribution based on upstream 0.5.16. No additional migrations.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fork Release:**\n- Publish the bamboo-pan single distribution as `@bamboo-pan/trellis` with npm dist-tag `single`.",
+  "migrations": [],
+  "notes": "No migration required. This manifest records the published fork npm version so manifest continuity checks preserve the fork update chain."
+}

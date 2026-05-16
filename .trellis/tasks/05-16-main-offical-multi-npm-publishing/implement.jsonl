@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cli/backend/index.md","reason":"Identify backend/CLI pre-development checklist and quality gates for package release config changes."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Follow TypeScript/package quality rules when touching CLI package scripts or metadata."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Decide whether metadata/workflow-only release config changes require tests."}
+{"file":".trellis/spec/guides/index.md","reason":"Shared guide index, especially pre-modification search rule."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Release config constants are repeated; search and update all matching occurrences consistently."}
