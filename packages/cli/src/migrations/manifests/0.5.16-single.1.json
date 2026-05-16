@@ -1,0 +1,9 @@
+{
+  "version": "0.5.16-single.1",
+  "description": "Single-agent fork patch: make Phase 3.4 commit-plan display non-blocking when all included files are recognized task work.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Workflow:**\n- Phase 3.4 still shows a batched commit plan, but the plan is no longer a required confirmation gate when every included file is recognized current-session task work.\n- The AI commits recognized task work after displaying the plan and only pauses when dirty file ownership is ambiguous.\n- Finish-work and trellis-meta references now describe the non-blocking commit flow consistently.",
+  "migrations": [],
+  "notes": "Run `trellis update` to refresh workflow.md, finish-work prompts, and trellis-meta workflow references. No migration required because file paths did not change."
+}

@@ -1,0 +1,9 @@
+{
+  "version": "0.5.16-single.0",
+  "description": "Fork single-agent variant corresponding to the 0.5.16 line; no variant-specific migration actions.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Fork Variant:**\n- Publish the bamboo-pan single-agent variant for the 0.5.16 line.\n- No migration actions beyond the existing 0.5.16 manifest chain.",
+  "migrations": [],
+  "notes": "No variant-specific migration required."
+}

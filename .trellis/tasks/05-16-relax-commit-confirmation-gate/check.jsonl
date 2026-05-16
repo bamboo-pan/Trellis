@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cli/backend/workflow-state-contract.md", "reason": "Verify in_progress breadcrumb still mentions Phase 3.4."}
+{"file": ".trellis/spec/cli/unit-test/conventions.md", "reason": "Check whether doc/template text changes require tests."}

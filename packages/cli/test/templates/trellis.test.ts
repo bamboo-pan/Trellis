@@ -99,8 +99,15 @@ describe("trellis template constants", () => {
     const block = inProgressBreadcrumb();
     expect(block).toContain("Phase 3.3 spec update gate");
     expect(block).toContain("drive Phase 3.4 commit");
+    expect(block).toContain("without waiting when every included file is recognized current-session task work");
     expect(block).toContain("BEFORE suggesting `/trellis:finish-work`");
     expect(block).not.toContain("Sub-agent self-exemption");
+  });
+
+  it("[single-flow] workflow.md Phase 3.4 commit plan is not a confirmation gate", () => {
+    expect(workflowMdTemplate).toContain("Present the plan once, then continue without a confirmation gate");
+    expect(workflowMdTemplate).toContain("Do NOT wait for `ok` / `行` just to execute the commit plan");
+    expect(workflowMdTemplate).not.toContain("ask for one-shot confirmation");
   });
 
   it("[single-flow] workflow.md Phase 2 steps load context in the main session", () => {

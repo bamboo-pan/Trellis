@@ -82,7 +82,7 @@ Development Flow (workflow.md Phase 3):
   3.1 Quality verification
   3.2 Debug retrospective (on demand)
   3.3 Spec update
-  3.4 Commit changes  -> AI drafts batched commits, user confirms
+  3.4 Commit changes  -> AI drafts batched commits, commits recognized task work
   3.5 Wrap-up         -> /finish-work (this prompt: survey + archive + journal)
 
 Debug Flow:

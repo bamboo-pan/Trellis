@@ -106,6 +106,17 @@ Read from `packages/cli/package.json` scripts. The high-level flow:
 
 Any failure between step 3 and step 8 leaves the working tree in a recoverable state because no tag has been pushed yet.
 
+### Fork `single` / `multi` npm variant releases
+
+The bamboo-pan fork can publish prerelease variants such as `0.5.16-single.0` and `0.5.16-multi.0` under npm dist-tags (`single`, `multi`). These versions are still public npm versions, so they participate in `check-manifest-continuity` exactly like stable, beta, or rc releases.
+
+Before publishing a new variant version:
+
+- Add a manifest named exactly after the variant version, e.g. `packages/cli/src/migrations/manifests/0.5.16-single.1.json`.
+- If an older variant version was already published without a manifest, restore continuity by adding a no-op manifest for that published version before the next release.
+- Use `--tag single` or `--tag multi` when publishing locally, or push a `v<version>` tag and let the GitHub publish workflow infer the tag from the version suffix.
+- Do not bypass `check-manifest-continuity` for variant releases; a missing variant manifest still breaks adjacent-version update chains.
+
 ### Why submodules are excluded from auto-staging
 
 Step 4's `:!docs-site` / `:!marketplace` exclusions are deliberate. Submodule pointer bumps must:
