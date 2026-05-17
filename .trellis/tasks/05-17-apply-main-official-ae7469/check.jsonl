@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cli/backend/index.md","reason":"Quality check entry point for backend/script changes."}
+{"file":".trellis/spec/cli/backend/script-conventions.md","reason":"Verify Python task-store changes follow script conventions."}
+{"file":".trellis/spec/cli/backend/error-handling.md","reason":"Verify duplicate archived-task handling reports clear errors."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"General backend quality expectations."}
+{"file":".trellis/spec/cli/unit-test/index.md","reason":"Quality check entry point for regression tests."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Regression test should exercise meaningful behavior rather than tautology."}

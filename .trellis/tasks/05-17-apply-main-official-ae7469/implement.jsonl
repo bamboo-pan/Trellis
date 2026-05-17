@@ -1,0 +1,10 @@
+{"file":".trellis/spec/guides/index.md","reason":"Shared pre-development thinking guide index for cross-layer/reuse concerns."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Task-store logic is mirrored between dogfood scripts and packaged templates; avoid drift."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Change spans runtime script, template copy, and regression tests."}
+{"file":".trellis/spec/cli/backend/index.md","reason":"Backend spec index for Python script work."}
+{"file":".trellis/spec/cli/backend/script-conventions.md","reason":"Standards for .trellis/scripts Python modules."}
+{"file":".trellis/spec/cli/backend/error-handling.md","reason":"Error behavior for CLI/runtime task operations."}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"General CLI/backend quality gate."}
+{"file":".trellis/spec/cli/unit-test/index.md","reason":"Unit/regression test spec index."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Regression test expectations and anti-patterns."}
+{"file":".trellis/spec/cli/unit-test/mock-strategies.md","reason":"Testing should use real temp filesystem paths with minimal mocking."}
