@@ -1,0 +1,9 @@
+{
+  "version": "0.5.16-single.2",
+  "description": "Single-agent fork patch: block archived task directory collisions during task creation.",
+  "breaking": false,
+  "recommendMigrate": false,
+  "changelog": "**Bug Fixes:**\n- `task.py create` now refuses to recreate a task directory name that already exists under `.trellis/tasks/archive/`.\n- This prevents archived task history from being silently shadowed by a newly seeded active task with the same date slug.",
+  "migrations": [],
+  "notes": "Run `trellis update` to refresh task.py and the packaged Trellis script templates. No migration required because file paths did not change."
+}
